@@ -1,8 +1,10 @@
+import sys
 import asyncio
 import json
+import shlex
 from typing import Optional
 import argparse
-from .transport import StdinTransport
+from .transport import StdinTransport, StdoutTransport, PipeTransport
 from .packet import PacketTransport, BinarySizeCodec
 
 
@@ -44,7 +46,7 @@ class Interface():
 
 class BinaryStream():
     def __init__(self, stdin, stdout):
-        self._transport = PacketTransport(size_codec=BinarySizeCodec, inner=StdinTransport(stdin, stdout))
+        self._transport = PacketTransport(size_codec=BinarySizeCodec, inner=PipeTransport(stdin, stdout))
 
     def read_json(self):
         try:
@@ -55,7 +57,21 @@ class BinaryStream():
 
     def write_json(self, data, indent=None):
         try:
-            return asyncio.get_event_loop().run_until_complete(self._transport.write(json.dumps(data, indent=indent).encode()))
+            asyncio.get_event_loop().run_until_complete(self._transport.write(json.dumps(data, indent=indent).encode()))
+            asyncio.get_event_loop().run_until_complete(self._transport.drain())
+        except Exception as e:
+            print(e)
+
+    def read_bytes(self):
+        try:
+            return asyncio.get_event_loop().run_until_complete(self._transport.read())
+        except Exception as e:
+            print(e)
+            return None
+
+    def write_bytes(self, data):
+        try:
+            return asyncio.get_event_loop().run_until_complete(self._transport.write(data))
         except Exception as e:
             print(e)
 
@@ -84,3 +100,53 @@ def main(run, parser: argparse.ArgumentParser, argv=None):
     args = parser.parse_args(argv[1:])
     run(args)
         
+
+def call(argv, *, stdin = None, stdout = None, stderr = None):
+    """Run a node with gada.
+
+    :param argv: additional CLI arguments
+    :param stdin: input stream (default sys.stdin)
+    :param stdout: output stream (default sys.stdout)
+    :param stderr: error stream (default sys.stderr)
+    """
+    argv = argv if argv is not None else []
+    stdin = stdin if stdin is not None else sys.stdin
+    stdout = stdout if stdout is not None else StdoutTransport(sys.stdout)
+    stderr = stderr if stderr is not None else StdoutTransport(sys.stderr)
+
+    async def stream(stdin, stdout):
+        """Pipe content of stdin to stdout until EOF.
+
+        :param stdin: input stream
+        :param stdout: output stream
+        """
+        try:
+            while True:
+                line = await stdin.readline()
+                if not line:
+                    return
+
+                stdout.write(line)
+                await stdout.drain()
+        except Exception as e:
+            pass
+
+    async def run_subprocess():
+        """Run a subprocess."""
+        proc = await asyncio.create_subprocess_shell(
+            f"gada {' '.join(argv)}",
+            stdin=stdin,
+            stdout=asyncio.subprocess.PIPE,
+            stderr=asyncio.subprocess.PIPE,
+        )
+
+        await asyncio.wait(
+            [
+                asyncio.create_task(stream(proc.stdout, stdout)),
+                asyncio.create_task(stream(proc.stderr, stderr)),
+                asyncio.create_task(proc.wait()),
+            ],
+            return_when=asyncio.ALL_COMPLETED,
+        )
+
+    asyncio.get_event_loop().run_until_complete(run_subprocess())

@@ -1,0 +1,20 @@
+nodes:
+  pymodule_sum:
+    runner: pymodule
+    entrypoint: sum
+  pymodule_sum2:
+    runner: pymodule
+    module: gadalang_testnodes
+    entrypoint: sum
+  pymodule_noentrypoint:
+    runner: pymodule
+  pymodule_invalidmodule:
+    runner: pymodule
+    module: invalid
+    entrypoint: sum
+  pymodule_invalidentrypoint:
+    runner: pymodule
+    entrypoint: invalid
+  python_sum:
+    runner: python
+    file: __init__.py

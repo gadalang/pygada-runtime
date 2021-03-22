@@ -1,4 +1,4 @@
-__all__ = ["AbstractTransport", "StdinTransport"]
+__all__ = ["AbstractTransport", "PipeTransport", "StdinTransport", "StdoutTransport"]
 from abc import ABC, abstractmethod
 
 
@@ -37,16 +37,56 @@ class AbstractTransport(ABC):
         raise NotImplementedError()
 
 
-class StdinTransport(AbstractTransport):
+class PipeTransport(AbstractTransport):
     def __init__(self, stdin, stdout):
         self._stdin = stdin
         self._stdout = stdout
 
     async def readexactly(self, size):
+        return self._stdin.read(size)
+
+    async def write(self, data):
+        await self._stdout.write(data)
+
+    async def drain(self):
+        await self._stdout.drain()
+
+    def close(self):
+        pass
+
+    async def wait_closed(self):
+        pass
+
+
+class StdinTransport(AbstractTransport):
+    def __init__(self, stdin):
+        self._stdin = stdin
+
+    async def readexactly(self, size):
         return self._stdin.buffer.read(size)
 
     async def write(self, data):
-        self._stdout.buffer.write(data)
+        raise NotImplementedError()
+
+    async def drain(self):
+        raise NotImplementedError()
+
+    def close(self):
+        pass
+
+    async def wait_closed(self):
+        pass
+
+
+class StdoutTransport(AbstractTransport):
+    def __init__(self, stdout):
+        self._stdout = stdout
+
+    async def readexactly(self, size):
+        pass
+
+    async def write(self, data):
+        self._stdout.write(data)
 
     async def drain(self):
         pass

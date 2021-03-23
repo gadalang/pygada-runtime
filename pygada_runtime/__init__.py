@@ -5,10 +5,9 @@ import shlex
 from typing import Optional
 import argparse
 from .transport import StdinTransport, StdoutTransport, PipeTransport
-from .packet import PacketTransport, BinarySizeCodec
 
 
-class Transport():
+class Transport:
     def __init__(self, reader, writer):
         self._reader = reader
         self._writer = writer
@@ -20,7 +19,7 @@ class Transport():
         await self._writer.wait_closed()
 
 
-class Interface():
+class Interface:
     def __init__(in_port: int, out_port: int) -> None:
         self._in_port = in_port
         self._out_port = out_port
@@ -29,11 +28,11 @@ class Interface():
 
     async def __aenter__(self):
         # Input stream
-        reader, writer = await asyncio.open_connection('127.0.0.1', in_port)
+        reader, writer = await asyncio.open_connection("127.0.0.1", in_port)
         self._in = Transport(reader, writer)
 
         # Output stream
-        reader, writer = await asyncio.open_connection('127.0.0.1', out_port)
+        reader, writer = await asyncio.open_connection("127.0.0.1", out_port)
         self._out = Transport(reader, writer)
 
     async def __aexit__(self, *args, **kwargs):
@@ -44,20 +43,28 @@ class Interface():
         await self._out.wait_closed()
 
 
-class BinaryStream():
+class BinaryStream:
     def __init__(self, stdin, stdout):
-        self._transport = PacketTransport(size_codec=BinarySizeCodec, inner=PipeTransport(stdin, stdout))
+        self._transport = PacketTransport(
+            size_codec=BinarySizeCodec, inner=PipeTransport(stdin, stdout)
+        )
 
     def read_json(self):
         try:
-            return json.loads(asyncio.get_event_loop().run_until_complete(self._transport.read()).decode())
+            return json.loads(
+                asyncio.get_event_loop()
+                .run_until_complete(self._transport.read())
+                .decode()
+            )
         except Exception as e:
             print(e)
             return None
 
     def write_json(self, data, indent=None):
         try:
-            asyncio.get_event_loop().run_until_complete(self._transport.write(json.dumps(data, indent=indent).encode()))
+            asyncio.get_event_loop().run_until_complete(
+                self._transport.write(json.dumps(data, indent=indent).encode())
+            )
             asyncio.get_event_loop().run_until_complete(self._transport.drain())
         except Exception as e:
             print(e)
@@ -71,7 +78,9 @@ class BinaryStream():
 
     def write_bytes(self, data):
         try:
-            return asyncio.get_event_loop().run_until_complete(self._transport.write(data))
+            return asyncio.get_event_loop().run_until_complete(
+                self._transport.write(data)
+            )
         except Exception as e:
             print(e)
 
@@ -80,8 +89,12 @@ def get_parser(prog: Optional[str] = None) -> argparse.ArgumentParser:
     import argparse
 
     parser = argparse.ArgumentParser(prog)
-    parser.add_argument("--chain-input", action="store_true", help="read input from stdin")
-    parser.add_argument("--chain-output", action="store_true", help="write output to stdout")
+    parser.add_argument(
+        "--chain-input", action="store_true", help="read input from stdin"
+    )
+    parser.add_argument(
+        "--chain-output", action="store_true", help="write output to stdout"
+    )
     return parser
 
 
@@ -99,9 +112,9 @@ def main(run, parser: argparse.ArgumentParser, argv=None):
 
     args = parser.parse_args(argv[1:])
     run(args)
-        
 
-def call(argv, *, stdin = None, stdout = None, stderr = None):
+
+def call(argv, *, stdin=None, stdout=None, stderr=None):
     """Run a node with gada.
 
     :param argv: additional CLI arguments

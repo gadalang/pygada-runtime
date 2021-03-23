@@ -7,13 +7,14 @@ from . import stream
 from .stream import StreamBase
 
 
-class Process():
-    def __init__(self, *, stdout: StreamBase = None, stderr: StreamBase = None):
+class Process:
+    def __init__(self, proc, *, stdout: StreamBase = None, stderr: StreamBase = None):
         """Process instance.
 
         :param stdout: output stream (default sys.stdout)
         :param stderr: error stream (default sys.stderr)
         """
+        self._proc = proc
         self._stdout = stream.wrap(stdout if stdout is not None else sys.stdout)
         self._stderr = stream.wrap(stderr if stderr is not None else sys.stderr)
 
@@ -29,24 +30,28 @@ class Process():
         )
 
     @property
-    def stdout(self):
-        return self._stdout
-
-    @property
-    def stderr(self):
-        return self._stderr
+    def returncode(self):
+        return self._proc.returncode
 
     async def wait(self):
-        """Wait for process to terminate.
-        """
-        await self._task.wait()
+        """Wait for process to terminate."""
+        await self._task
 
 
-async def run(node: str, argv: List = None, *, stdin = None, stdout: StreamBase = None, stderr: StreamBase = None) -> Process:
+async def run(
+    node: str,
+    argv: List = None,
+    *,
+    env: dict = None,
+    stdin=None,
+    stdout: StreamBase = None,
+    stderr: StreamBase = None,
+) -> Process:
     """Run a gada node.
 
     :param node: gada node to run
     :param argv: additional CLI arguments
+    :param env: environment variables
     :param stdin: input stream (default sys.stdin)
     :param stdout: output stream (default sys.stdout)
     :param stderr: error stream (default sys.stderr)
@@ -54,14 +59,18 @@ async def run(node: str, argv: List = None, *, stdin = None, stdout: StreamBase 
     """
     argv = argv if argv is not None else []
 
+    _env = os.environ
+    _env.update(env)
+
     # Spawn a subprocess
     return Process(
         proc=await asyncio.create_subprocess_shell(
-            f"{node} {' '.join(argv)}",
+            f"gada {node} {' '.join(argv)}",
+            env=_env,
             stdin=stdin,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE,
         ),
         stdout=stdout,
-        stderr=stderr
+        stderr=stderr,
     )

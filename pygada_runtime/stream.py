@@ -1,17 +1,37 @@
-__all__ = ["StreamBase", "IOBaseStream", "BytesIOStream", "TextIOStream", "wrap", "feed", "PipeStream"]
+"""Provide functions for async IO.
+"""
+__all__ = [
+    "StreamBase",
+    "IOBaseStream",
+    "BytesIOStream",
+    "TextIOStream",
+    "wrap",
+    "feed",
+    "PipeStream",
+    "PacketStream",
+    "write_packet",
+    "read_packet"
+]
 import io
 import os
 import asyncio
 import functools
+import struct
 from abc import ABC, abstractmethod
 
 
 class StreamBase(ABC):
-    """Base to wrap ``IOBase`` subclasses throught a common interface.
-    """
+    """Base to wrap ``IOBase`` subclasses throught a common interface."""
+
     @abstractmethod
     async def read(self, size: int = -1) -> bytes:
         raise NotImplementedError()
+
+    async def readexactly(self, size: int = -1) -> bytes:
+        data = await self.read(size)
+        if len(data) != size:
+            raise Exception(f"{len(data)} != {size}")
+        return data
 
     @abstractmethod
     def write(self, data):
@@ -19,6 +39,10 @@ class StreamBase(ABC):
 
     @abstractmethod
     async def drain(self):
+        raise NotImplementedError()
+
+    @abstractmethod
+    def eof(self):
         raise NotImplementedError()
 
     @abstractmethod
@@ -49,13 +73,16 @@ class IOBaseStream(StreamBase):
     async def readline(self) -> str:
         return await self._inner.readline()
 
-    async def read(self) -> str:
+    async def read(self, size: int = -1) -> str:
         raise NotImplementedError()
 
     def write(self, data):
         raise NotImplementedError()
 
     async def drain(self):
+        raise NotImplementedError()
+
+    def eof(self):
         raise NotImplementedError()
 
     def close(self):
@@ -73,13 +100,18 @@ class TextIOStream(IOBaseStream):
         """
         IOBaseStream.__init__(self, inner)
 
-    async def read(self, size: int=-1) -> bytes:
-        return self._inner.read(size)
+    async def read(self, size: int = -1) -> bytes:
+        return (await asyncio.get_event_loop().run_in_executor(
+            None, functools.partial(self._inner.read, size)
+        )).encode()
 
     def write(self, data):
-        self._inner.write(data.decode())
+        self._inner.write(data.decode(errors="ignore"))
 
     async def drain(self):
+        pass
+
+    def eof(self):
         pass
 
     def close(self):
@@ -92,18 +124,23 @@ class TextIOStream(IOBaseStream):
 class BytesIOStream(IOBaseStream):
     def __init__(self, inner: io.BytesIO):
         """Wrap a ``BytesIO`` throught common ``StreamBase`` interface.
-    
+
         :param inner: BytesIO to wrap
         """
         IOBaseStream.__init__(self, inner)
 
-    async def read(self, size: int=-1) -> bytes:
-        return self._inner.read(size)
+    async def read(self, size: int = -1) -> bytes:
+        return await asyncio.get_event_loop().run_in_executor(
+            None, functools.partial(self._inner.read, size)
+        )
 
     def write(self, data):
         self._inner.write(data)
 
     async def drain(self):
+        pass
+
+    def eof(self):
         pass
 
     def close(self):
@@ -125,8 +162,12 @@ def wrap(inner) -> StreamBase:
         return BytesIOStream(inner)
     if isinstance(inner, io.TextIOBase):
         return TextIOStream(inner)
+    if isinstance(inner, asyncio.StreamReader):
+        return inner
 
-    raise Exception(f"expected an instance of io.BytesIO, io.TextIOBase or StreamBase, got {inner.__class__.__name__}")
+    raise Exception(
+        f"expected an instance of io.BytesIO, io.TextIOBase, asyncio.StreamReader or StreamBase, got {inner.__class__.__name__}"
+    )
 
 
 async def feed(stdin: StreamBase, stdout: StreamBase):
@@ -141,6 +182,7 @@ async def feed(stdin: StreamBase, stdout: StreamBase):
     while True:
         line = await stdin.readline()
         if not line:
+            stdout.eof()
             return
 
         stdout.write(line)
@@ -159,20 +201,30 @@ class PipeStream(StreamBase):
 
     def __enter__(self):
         self._r, self._w = os.pipe()
-        self._r, self._w = os.fdopen(self._r, 'rb'), os.fdopen(self._w, 'wb')
+        self._r, self._w = os.fdopen(self._r, "rb"), os.fdopen(self._w, "wb")
         return self
 
     def __exit__(self, *args, **kwargs):
         self.close()
 
-    async def read(self, size: int =-1) -> bytes:
+    @property
+    def reader(self):
+        return self._r
+
+    @property
+    def writer(self):
+        return self._w
+
+    async def read(self, size: int = -1) -> bytes:
         """Read size bytes from the reader end or until EOF.
 
         :param size: number of bytes to read
         :return: read bytes
         """
         # Avoid blocking the main thread
-        return await asyncio.get_event_loop().run_in_executor(None, functools.partial(self._r.read, size))
+        return await asyncio.get_event_loop().run_in_executor(
+            None, functools.partial(self._r.read, size)
+        )
 
     async def readline(self) -> bytes:
         """Read data until newline character from the reader end.
@@ -190,24 +242,20 @@ class PipeStream(StreamBase):
         self._w.write(data)
 
     async def drain(self):
-        """Drain data in the writer end.
-        """
+        """Drain data in the writer end."""
         await asyncio.get_event_loop().run_in_executor(None, self._w.flush)
 
     def close(self):
-        """Close both ends.
-        """
+        """Close both ends."""
         self._close_reader()
         self._close_writer()
 
     def eof(self):
-        """Close the writer end to mark EOF.
-        """
+        """Close the writer end to mark EOF."""
         self._close_writer()
 
     def _close_reader(self):
-        """Close the reader end.
-        """
+        """Close the reader end."""
         if not self._r:
             return
 
@@ -218,8 +266,7 @@ class PipeStream(StreamBase):
         self._r = None
 
     def _close_writer(self):
-        """Close the writer end.
-        """
+        """Close the writer end."""
         if not self._w:
             return
 
@@ -230,6 +277,43 @@ class PipeStream(StreamBase):
         self._w = None
 
     async def wait_closed(self):
-        """Wait for both ends to be closed.
-        """
+        """Wait for both ends to be closed."""
         pass
+
+
+class PacketStream():
+    def __init__(self, inner: StreamBase):
+        self._inner = wrap(inner)
+
+    async def read(self, size: int = -1) -> bytes:
+        data = await self._inner.readexactly(4)
+        size = struct.unpack("<I", data)[0]
+        return await self._inner.readexactly(size)
+
+    def write(self, data):
+        self._inner.write(struct.pack("<I", len(data)))
+        self._inner.write(data)
+
+    async def drain(self):
+        await self._inner.drain()
+
+    def close(self):
+        self._inner.close()
+
+    async def wait_closed(self):
+        await self._inner.wait_closed()
+
+
+async def write_packet(stdout: StreamBase, data: bytes):
+    """Write a packet to output stream.
+    """
+    writer = PacketStream(stdout)
+    writer.write(data)
+    await writer.drain()
+
+
+async def read_packet(stdin) -> bytes:
+    """Read a packet from input stream.
+    """
+    reader = PacketStream(stdin)
+    return await reader.read()

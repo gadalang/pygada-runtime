@@ -27,10 +27,12 @@ jobs:
     - name: Install dependencies
       run: |
         python -m pip install --upgrade pip
-        python -m pip install wheel tox
+        python -m pip install wheel tox tox-gh-actions
     - name: Test with coverage
       run: |
-        tox .
+        tox -e begin
+        tox
+        tox -e end
     - if: matrix.python-version == '3.8'
       name: Publish coverage
       uses: codecov/codecov-action@v1

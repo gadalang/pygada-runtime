@@ -1,10 +1,9 @@
-__all__ = ["run"]
+__all__ = ["Process", "run"]
 import sys
 import os
 import asyncio
 from typing import Optional, List
-from . import stream
-from .stream import StreamBase
+from ._stream import StreamBase, wrap, feed
 
 
 class Process:
@@ -15,14 +14,14 @@ class Process:
         :param stderr: error stream (default sys.stderr)
         """
         self._proc = proc
-        self._stdout = stream.wrap(stdout if stdout is not None else sys.stdout)
-        self._stderr = stream.wrap(stderr if stderr is not None else sys.stderr)
+        self._stdout = wrap(stdout if stdout is not None else sys.stdout)
+        self._stderr = wrap(stderr if stderr is not None else sys.stderr)
 
         self._task = asyncio.create_task(
             asyncio.wait(
                 [
-                    asyncio.create_task(stream.feed(proc.stdout, self._stdout)),
-                    asyncio.create_task(stream.feed(proc.stderr, self._stderr)),
+                    asyncio.create_task(feed(proc.stdout, self._stdout)),
+                    asyncio.create_task(feed(proc.stderr, self._stderr)),
                     asyncio.create_task(proc.wait()),
                 ],
                 return_when=asyncio.ALL_COMPLETED,

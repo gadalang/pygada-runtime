@@ -4,8 +4,8 @@ import sys
 import io
 import asyncio
 import unittest
-from pygada_runtime.stream import *
-from pygada_runtime import runner
+import pygada_runtime
+from pygada_runtime import PipeStream, write_packet, read_packet
 from pygada_runtime.test_utils import *
 import binaryiotools
 
@@ -20,7 +20,7 @@ def run(node, argv=[], *, stdin=None):
             with PipeStream() as stdout:
                 with PipeStream() as stderr:
                     # Run gada node
-                    proc = await runner.run(
+                    proc = await pygada_runtime.run(
                         node,
                         argv,
                         env={"PYTHONPATH": os.path.dirname(__file__)},

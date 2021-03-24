@@ -5,7 +5,6 @@ PYTHONPATH will be automatically set so Python can find this package.
 import sys
 import asyncio
 import pygada_runtime
-from pygada_runtime.stream import *
 import binaryiotools
 
 
@@ -21,7 +20,7 @@ def _sum(args):
 
     if args.chain_input:
         # Chain input => receive arguments from stdin
-        data = asyncio.get_event_loop().run_until_complete(read_packet(sys.stdin))
+        data = asyncio.get_event_loop().run_until_complete(pygada_runtime.read_packet(sys.stdin))
         buffer = binaryiotools.IO(data)
         values = [buffer.i32 for _ in range(buffer.i32)]
     else:
@@ -38,7 +37,7 @@ def _sum(args):
         # Chain output => send result to stdout
         buffer = binaryiotools.IO()
         buffer.i32 = result
-        write_packet(sys.stdout, buffer.data)
+        pygada_runtime.write_packet(sys.stdout, buffer.data)
     else:
         # Print result to stdout
         print(result)

@@ -94,7 +94,7 @@ class RunnerTestCase(unittest.TestCase):
             buffer.i32 = 1
             buffer.i32 = 2
             buffer.index = 0
-            await write_packet(stdin, buffer.data)
+            write_packet(stdin, buffer.data)
             stdin.eof()
 
 

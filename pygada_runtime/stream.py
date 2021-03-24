@@ -10,7 +10,9 @@ __all__ = [
     "PipeStream",
     "PacketStream",
     "write_packet",
-    "read_packet"
+    "read_packet",
+    "write_json",
+    "read_json"
 ]
 import io
 import os
@@ -304,16 +306,23 @@ class PacketStream():
         await self._inner.wait_closed()
 
 
-async def write_packet(stdout: StreamBase, data: bytes):
+def write_packet(stdout: StreamBase, data: bytes) -> None:
     """Write a packet to output stream.
     """
     writer = PacketStream(stdout)
     writer.write(data)
-    await writer.drain()
 
 
-async def read_packet(stdin) -> bytes:
+async def read_packet(stdin: StreamBase) -> bytes:
     """Read a packet from input stream.
     """
     reader = PacketStream(stdin)
     return await reader.read()
+
+
+def write_json(stdout: StreamBase, data: dict, indent=None) -> None:
+    write_packet(stdout, json.dumps(data, indent=indent).encode())
+
+
+async def read_json(stdin: StreamBase) -> dict:
+    return json.loads((await read_packet(stdout)).decode())

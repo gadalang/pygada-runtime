@@ -38,7 +38,7 @@ def _sum(args):
         # Chain output => send result to stdout
         buffer = binaryiotools.IO()
         buffer.i32 = result
-        asyncio.get_event_loop().run_until_complete(write_packet(sys.stdout, buffer.data))
+        write_packet(sys.stdout, buffer.data)
     else:
         # Print result to stdout
         print(result)

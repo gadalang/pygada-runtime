@@ -37,8 +37,6 @@ setup(
     long_description_content_type="text/markdown",
     packages=find_packages(exclude=["tests"]),
     install_requires=["binaryiotools"],
-    test_suite="test",
-    tests_require=["nose", "nose-cover3"],
     include_package_data=True,
     zip_safe=False,
     python_requires=">=3.7",

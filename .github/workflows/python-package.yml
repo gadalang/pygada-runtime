@@ -28,7 +28,7 @@ jobs:
       run: |
         python -m pip install --upgrade pip
         python -m pip install -e .
-        python -m pip install wheel tox tox-gh-actions gada
+        python -m pip install wheel tox tox-gh-actions gada gada-pyrunner
     - name: Test with coverage
       run: |
         tox -e begin

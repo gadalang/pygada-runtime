@@ -1,7 +1,4 @@
-__all__ = [
-    "get_parser",
-    "main"
-]
+__all__ = ["get_parser", "main"]
 import sys
 import argparse
 from typing import Optional

@@ -1,7 +1,14 @@
 __all__ = ["StreamTestCase"]
 import io
 import unittest
-from pygada_runtime import wrap, feed, PipeStream, BytesIOStream, TextIOStream, StreamBase
+from pygada_runtime import (
+    wrap,
+    feed,
+    PipeStream,
+    BytesIOStream,
+    TextIOStream,
+    StreamBase,
+)
 from pygada_runtime.test_utils import *
 
 

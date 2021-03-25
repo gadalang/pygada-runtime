@@ -44,7 +44,8 @@ Contents:
    :maxdepth: 2
 
    runner
-   stream
+   pipestream
+   iofunctions
 
 Indices and tables
 ==================

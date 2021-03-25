@@ -20,7 +20,9 @@ def _sum(args):
 
     if args.chain_input:
         # Chain input => receive arguments from stdin
-        data = asyncio.get_event_loop().run_until_complete(pygada_runtime.read_packet(sys.stdin))
+        data = asyncio.get_event_loop().run_until_complete(
+            pygada_runtime.read_packet(sys.stdin)
+        )
         buffer = binaryiotools.IO(data)
         values = [buffer.i32 for _ in range(buffer.i32)]
     else:

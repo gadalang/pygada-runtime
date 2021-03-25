@@ -12,7 +12,7 @@ __all__ = [
     "write_packet",
     "read_packet",
     "write_json",
-    "read_json"
+    "read_json",
 ]
 import io
 import os
@@ -104,9 +104,11 @@ class TextIOStream(IOBaseStream):
         IOBaseStream.__init__(self, inner)
 
     async def read(self, size: int = -1) -> bytes:
-        return (await asyncio.get_event_loop().run_in_executor(
-            None, functools.partial(self._inner.read, size)
-        )).encode()
+        return (
+            await asyncio.get_event_loop().run_in_executor(
+                None, functools.partial(self._inner.read, size)
+            )
+        ).encode()
 
     def write(self, data):
         self._inner.write(data.decode(errors="ignore"))
@@ -193,18 +195,71 @@ async def feed(stdin: StreamBase, stdout: StreamBase):
 
 
 class PipeStream(StreamBase):
+    """Pipe allowing both read and write operations on the same stream.
+
+    This is a wrapper for ``os.pipe()`` that makes read operations asynchronous.
+
+    Use ``PipeStream`` as a context so it will be automatically closed afterward:
+
+    .. code-block:: python
+
+        >>> import sys
+        >>> import asyncio
+        >>> import pygada_runtime
+        >>>
+        >>> async def main():
+        ...     # Pipe will be closed when exiting the context
+        ...     with pygada_runtime.PipeStream() as stream:
+        ...         # Write some data to writer end
+        ...         stream.write(b'hello world')
+        ...         # Close the writer end and mark EOF
+        ...         stream.eof()
+        ...
+        ...         # Read data from reader end until EOF
+        ...         print(await stream.read())
+        >>>
+        >>> asyncio.run(main())
+        b'hello world'
+        >>>
+
+    Or use ``PipeStream`` without a context, but be sure to close it properly afterward:
+
+    .. code-block:: python
+
+        >>> import sys
+        >>> import asyncio
+        >>> import pygada_runtime
+        >>>
+        >>> async def main():
+        ...     stream = pygada_runtime.PipeStream()
+        ...
+        ...     # Write some data to writer end
+        ...     stream.write(b'hello world')
+        ...     # Close the writer end and mark EOF
+        ...     stream.eof()
+        ...
+        ...     # Read data from reader end until EOF
+        ...     print(await stream.read())
+        ...
+        ...     stream.close()
+        ...     await stream.wait_closed()
+        >>>
+        >>> asyncio.run(main())
+        b'hello world'
+        >>>
+
+    """
+
     def __init__(self):
         """Stream allowing both read and write operations.
 
         This is a wrapper for ``os.pipe()`` and make read operations
         asynchronous.
         """
-        self._r = None
-        self._w = None
-
-    def __enter__(self):
         self._r, self._w = os.pipe()
         self._r, self._w = os.fdopen(self._r, "rb"), os.fdopen(self._w, "wb")
+
+    def __enter__(self):
         return self
 
     def __exit__(self, *args, **kwargs):
@@ -219,26 +274,7 @@ class PipeStream(StreamBase):
         return self._w
 
     async def read(self, size: int = -1) -> bytes:
-        """Read size bytes from the reader end or until EOF.
-
-        :param size: number of bytes to read
-        :return: read bytes
-        """
-        # Avoid blocking the main thread
-        return await asyncio.get_event_loop().run_in_executor(
-            None, functools.partial(self._r.read, size)
-        )
-
-    async def readline(self) -> bytes:
-        """Read data until newline character from the reader end.
-
-        :return: read bytes
-        """
-        # Avoid blocking the main thread
-        return await asyncio.get_event_loop().run_in_executor(None, self._r.readline)
-
-    def write(self, data):
-        r"""Write data to the writer end:
+        r"""Read ``size`` bytes from the reader end or until EOF:
 
         .. code-block:: python
 
@@ -249,17 +285,79 @@ class PipeStream(StreamBase):
             >>> async def main():
             ...     with pygada_runtime.PipeStream() as stream:
             ...         stream.write(b'hello')
-            ...         await stream.drain()
+            ...         stream.write(b'world')
+            ...         # Mark EOF and close the writer end
+            ...         stream.eof()
             ...
+            ...         # Read the 5 first bytes
             ...         print(await stream.read(size=5))
+            ...         # Read until EOF
+            ...         print(await stream.read())
             >>>
             >>> asyncio.run(main())
             b'hello'
+            b'world'
             >>>
 
-        .. note:: Make sure to call this method to flush written data to avoid any
-            deadlock when attempting to read from the same pipe
+        :return: bytes including the newline character
+        """
+        # Avoid blocking the main thread
+        return await asyncio.get_event_loop().run_in_executor(
+            None, functools.partial(self._r.read, size)
+        )
 
+    async def readline(self) -> bytes:
+        r"""Read bytes from the reader end until newline character:
+
+        .. code-block:: python
+
+            >>> import sys
+            >>> import asyncio
+            >>> import pygada_runtime
+            >>>
+            >>> async def main():
+            ...     with pygada_runtime.PipeStream() as stream:
+            ...         stream.write(b'hello\r\n')
+            ...         stream.write(b'world\r\n')
+            ...         # Mark EOF and close the writer end
+            ...         stream.eof()
+            ...
+            ...         print(await stream.readline())
+            ...         print(await stream.readline())
+            >>>
+            >>> asyncio.run(main())
+            b'hello\r\n'
+            b'world\r\n'
+            >>>
+
+        :return: bytes including the newline character
+        """
+        # Avoid blocking the main thread
+        return await asyncio.get_event_loop().run_in_executor(None, self._r.readline)
+
+    def write(self, data: bytes):
+        r"""Write a raw byte array to the writer end:
+
+        .. code-block:: python
+
+            >>> import sys
+            >>> import asyncio
+            >>> import pygada_runtime
+            >>>
+            >>> async def main():
+            ...     with pygada_runtime.PipeStream() as stream:
+            ...         stream.write(b'hello')
+            ...         stream.write(b'world')
+            ...         # Mark EOF and close the writer end
+            ...         stream.eof()
+            ...
+            ...         print(await stream.read())
+            >>>
+            >>> asyncio.run(main())
+            b'helloworld'
+            >>>
+
+        :param data: byte array
         """
         self._w.write(data)
 
@@ -292,7 +390,25 @@ class PipeStream(StreamBase):
         await asyncio.get_event_loop().run_in_executor(None, self._w.flush)
 
     def close(self):
-        """Close both ends."""
+        r"""Close both ends.
+
+        .. code-block:: python
+
+            >>> import sys
+            >>> import asyncio
+            >>> import pygada_runtime
+            >>>
+            >>> async def main():
+            ...     stream = pygada_runtime.PipeStream()
+            ...     # Do something
+            ...
+            ...     stream.close()
+            ...     await stream.wait_closed()
+            >>>
+            >>> asyncio.run(main())
+            >>>
+
+        """
         self._close_reader()
         self._close_writer()
 
@@ -385,7 +501,7 @@ def write_packet(stdout: StreamBase, data: bytes) -> None:
         ...         pygada_runtime.write_packet(stream, b'hello')
         ...         pygada_runtime.write_packet(stream, b'world')
         ...         stream.eof()
-        ...         
+        ...
         ...         print(await stream.read())
         >>>
         b'\x05\x00\x00\x00hello\x05\x00\x00\x00world'
@@ -449,7 +565,7 @@ def write_json(stdout: StreamBase, data: dict, *args, **kwargs) -> None:
         ...     with pygada_runtime.PipeStream() as stream:
         ...         pygada_runtime.write_json(stream, {"msg": "hello 田中"})
         ...         stream.eof()
-        ...         
+        ...
         ...         print(await stream.read())
         >>>
         >>> asyncio.run(main())
@@ -479,7 +595,7 @@ async def read_json(stdin: StreamBase, *args, **kwargs) -> dict:
         ...     with pygada_runtime.PipeStream() as stream:
         ...         stream.write(b'\x1d\x00\x00\x00{"msg": "hello \\u7530\\u4e2d"}')
         ...         await stream.drain()
-        ...         
+        ...
         ...         print(await pygada_runtime.read_json(stream))
         >>>
         >>> asyncio.run(main())

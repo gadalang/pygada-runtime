@@ -97,7 +97,6 @@ class RunnerTestCase(unittest.TestCase):
             write_packet(stdin, buffer.data)
             stdin.eof()
 
-
             # Run gada node
             await worker()
 

@@ -3,7 +3,7 @@ import sys
 import os
 import asyncio
 from typing import Optional, List
-from ._stream import StreamBase, wrap, feed
+from ._stream import StreamBase, async_stream, feed
 
 
 class Process:
@@ -14,8 +14,8 @@ class Process:
         :param stderr: error stream (default sys.stderr)
         """
         self._proc = proc
-        self._stdout = wrap(stdout if stdout is not None else sys.stdout)
-        self._stderr = wrap(stderr if stderr is not None else sys.stderr)
+        self._stdout = async_stream(stdout if stdout is not None else sys.stdout)
+        self._stderr = async_stream(stderr if stderr is not None else sys.stderr)
 
         self._task = asyncio.create_task(
             asyncio.wait(

@@ -3,10 +3,9 @@ be useful for any gada nodes written in Python.
 """
 __all__ = [
     "StreamBase",
-    "IOBaseStream",
     "BytesIOStream",
     "TextIOStream",
-    "wrap",
+    "async_stream",
     "feed",
     "PipeStream",
     "write_packet",
@@ -24,7 +23,65 @@ from abc import ABC, abstractmethod
 
 
 class StreamBase(ABC):
-    """Base to wrap ``IOBase`` subclasses throught a common interface."""
+    r"""Base to wrap ``io.IOBase`` subclasses throught a common async interface.
+
+    The builtin Python module ``io`` provides multiple classes derived from ``IOBase``,
+    such as ``BytesIO``, ``TextIOBase`` or ``StringIO``, that work in a synchronous way:
+
+    .. code-block:: python
+
+        >>> import sys
+        >>>
+        >>> def main():
+        ...     print(type(sys.stdin))
+        ...
+        ...     # Will block until reading a newline from stdin
+        ...     print(sys.stdin.readline())
+        >>>
+        >>> # main()
+        <class '_io.TextIOWrapper'>
+        ..\r\n
+        >>>
+
+    The goal of ``StreamBase`` is to wrap those classes so it becomes possible to
+    read input asynchronously:
+
+    .. code-block:: python
+
+        >>> import sys
+        >>> import asyncio
+        >>> import pygada_runtime
+        >>>
+        >>> async def main():
+        ...     stream = pygada_runtime.TextIOStream(sys.stdin)
+        ...
+        ...     # readline is now an async task
+        ...     print(await stream.readline())
+        >>>
+        >>> # asyncio.run(main())
+        ..\r\n
+        >>>
+
+    For convenience, the :func:`async_stream` method is provided to wrap an
+    instance of ``io.IOBase`` to ``StreamBase``:
+
+    .. code-block:: python
+
+        >>> import sys
+        >>> import asyncio
+        >>> import pygada_runtime
+        >>>
+        >>> async def main():
+        ...     stream = pygada_runtime.async_stream(sys.stdin)
+        ...
+        ...     # readline is now an async task
+        ...     print(await stream.readline())
+        >>>
+        >>> # asyncio.run(main())
+        ..\r\n
+        >>>
+
+    """
 
     @abstractmethod
     async def read(self, size: int = -1) -> bytes:
@@ -35,6 +92,10 @@ class StreamBase(ABC):
         if len(data) != size:
             raise Exception(f"{len(data)} != {size}")
         return data
+
+    @abstractmethod
+    async def readline(self) -> bytes:
+        raise NotImplementedError()
 
     @abstractmethod
     def write(self, data):
@@ -65,49 +126,24 @@ class StreamBase(ABC):
         raise NotImplementedError()
 
 
-class IOBaseStream(StreamBase):
-    def __init__(self, inner: io.IOBase):
-        """Wrap a ``IOBase`` throught common ``StreamBase`` interface.
-
-        :param inner: IOBase to wrap
-        """
-        self._inner = inner
-
-    async def readline(self) -> str:
-        return await self._inner.readline()
-
-    async def read(self, size: int = -1) -> str:
-        raise NotImplementedError()
-
-    def write(self, data):
-        raise NotImplementedError()
-
-    async def drain(self):
-        raise NotImplementedError()
-
-    def eof(self):
-        raise NotImplementedError()
-
-    def close(self):
-        raise NotImplementedError()
-
-    async def wait_closed(self):
-        raise NotImplementedError()
-
-
-class TextIOStream(IOBaseStream):
+class TextIOStream(StreamBase):
     def __init__(self, inner: io.TextIOBase):
         """Wrap a ``TextIOBase`` throught common ``StreamBase`` interface.
 
         :param inner: TextIOBase to wrap
         """
-        IOBaseStream.__init__(self, inner)
+        self._inner = inner
 
     async def read(self, size: int = -1) -> bytes:
         return (
             await asyncio.get_event_loop().run_in_executor(
                 None, functools.partial(self._inner.read, size)
             )
+        ).encode()
+
+    async def readline(self) -> bytes:
+        return (
+            await asyncio.get_event_loop().run_in_executor(None, self._inner.readline)
         ).encode()
 
     def write(self, data):
@@ -126,17 +162,22 @@ class TextIOStream(IOBaseStream):
         pass
 
 
-class BytesIOStream(IOBaseStream):
+class BytesIOStream(StreamBase):
     def __init__(self, inner: io.BytesIO):
         """Wrap a ``BytesIO`` throught common ``StreamBase`` interface.
 
         :param inner: BytesIO to wrap
         """
-        IOBaseStream.__init__(self, inner)
+        self._inner = inner
 
     async def read(self, size: int = -1) -> bytes:
         return await asyncio.get_event_loop().run_in_executor(
             None, functools.partial(self._inner.read, size)
+        )
+
+    async def readline(self) -> bytes:
+        return await asyncio.get_event_loop().run_in_executor(
+            None, self._inner.readline
         )
 
     def write(self, data):
@@ -155,11 +196,22 @@ class BytesIOStream(IOBaseStream):
         pass
 
 
-def wrap(inner) -> StreamBase:
-    """Wrap a Python stream throught the common ``StreamBase`` interface.
+def async_stream(inner) -> StreamBase:
+    """Wrap an instance of ``io.IOBase`` throught the common :class:`StreamBase` interface:
 
-    :param inner: Python stream
-    :return: StreamBase instance
+    .. code-block:: python
+
+        >>> import io
+        >>> import pygada_runtime
+        >>>
+        >>> type(pygada_runtime.async_stream(io.BytesIO()))
+        <class 'pygada_runtime._stream.BytesIOStream'>
+        >>> type(pygada_runtime.async_stream(io.StringIO()))
+        <class 'pygada_runtime._stream.TextIOStream'>
+        >>>
+
+    :param inner: ``io.IOBase`` instance
+    :return: wrapped instance
     """
     if isinstance(inner, StreamBase):
         return inner
@@ -176,13 +228,36 @@ def wrap(inner) -> StreamBase:
 
 
 async def feed(stdin: StreamBase, stdout: StreamBase):
-    """Feed content of stdin to stdout until EOF.
+    """Feed content of stdin to stdout until EOF:
+
+    .. code-block:: python
+
+        >>> import io
+        >>> import asyncio
+        >>> import pygada_runtime
+        >>>
+        >>> async def main():
+        ...     stdin = io.BytesIO(b'hello')
+        ...     stdout = io.BytesIO()
+        ...
+        ...     # Feed data from stdin to stdout
+        ...     await pygada_runtime.feed(stdin, stdout)
+        ...
+        ...     # We need to reset current position in stdout
+        ...     stdout.seek(0)
+        ...
+        ...     # Read all data from stdout
+        ...     print(stdout.read())
+        >>>
+        >>> asyncio.run(main())
+        b'hello'
+        >>>
 
     :param stdin: input stream
     :param stdout: output stream
     """
-    stdin = wrap(stdin)
-    stdout = wrap(stdout)
+    stdin = async_stream(stdin)
+    stdout = async_stream(stdout)
 
     while True:
         line = await stdin.readline()
@@ -512,7 +587,7 @@ def write_packet(stdout: StreamBase, data: bytes) -> None:
     :param stdout: output stream
     :param data: byte array
     """
-    stdout = wrap(stdout)
+    stdout = async_stream(stdout)
     stdout.write(struct.pack("<I", len(data)))
     stdout.write(data)
 
@@ -546,7 +621,7 @@ async def read_packet(stdin: StreamBase) -> bytes:
     :param stdin: input stream
     :return: byte array
     """
-    stdin = wrap(stdin)
+    stdin = async_stream(stdin)
     data = await stdin.readexactly(4)
     size = struct.unpack("<I", data)[0]
     return await stdin.readexactly(size)

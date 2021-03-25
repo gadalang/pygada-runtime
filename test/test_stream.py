@@ -2,7 +2,7 @@ __all__ = ["StreamTestCase"]
 import io
 import unittest
 from pygada_runtime import (
-    wrap,
+    async_stream,
     feed,
     PipeStream,
     BytesIOStream,
@@ -16,9 +16,15 @@ class StreamTestCase(unittest.TestCase):
     def test_wrap(self):
         """Test wrapping Python ``io`` classes with ``stream.StreamBase``."""
         # Valid types
-        self.assertIsInstance(wrap(io.BytesIO()), BytesIOStream, "wrong wrapping")
-        self.assertIsInstance(wrap(io.TextIOBase()), TextIOStream, "wrong wrapping")
-        self.assertIsInstance(wrap(wrap(io.TextIOBase())), StreamBase, "wrong wrapping")
+        self.assertIsInstance(
+            async_stream(io.BytesIO()), BytesIOStream, "wrong wrapping"
+        )
+        self.assertIsInstance(
+            async_stream(io.TextIOBase()), TextIOStream, "wrong wrapping"
+        )
+        self.assertIsInstance(
+            async_stream(async_stream(io.TextIOBase())), StreamBase, "wrong wrapping"
+        )
 
         # Invalid type
         with self.assertRaises(Exception):

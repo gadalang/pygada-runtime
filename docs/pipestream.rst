@@ -5,6 +5,7 @@ PipeStream Class
 ================
 
 .. automodule:: pygada_runtime._stream
+    :noindex:
 
 .. autoclass:: pygada_runtime::PipeStream
     :members:

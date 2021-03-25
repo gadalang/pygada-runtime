@@ -44,6 +44,7 @@ Contents:
    :maxdepth: 2
 
    runner
+   streambase
    pipestream
    iofunctions
 

@@ -80,14 +80,10 @@ async def run(
         ...         # Read subprocess output
         ...         output = await stdout.read()
         ...
-        ...         # Print raw byte array output
-        ...         print(output)
-        ...
         ...         # Print output converted to str and remove newline
         ...         print(output.decode().strip())
         >>>
         >>> asyncio.run(main())
-        b'3\r\n'
         3
         >>>
 

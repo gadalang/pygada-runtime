@@ -40,7 +40,7 @@ class StreamBase(ABC):
         >>>
         >>> # main()
         <class '_io.TextIOWrapper'>
-        ..\r\n
+        ..\n
         >>>
 
     The goal of ``StreamBase`` is to wrap those classes so it becomes possible to
@@ -59,7 +59,7 @@ class StreamBase(ABC):
         ...     print(await stream.readline())
         >>>
         >>> # asyncio.run(main())
-        ..\r\n
+        ..\n
         >>>
 
     For convenience, the :func:`async_stream` method is provided to wrap an
@@ -78,7 +78,7 @@ class StreamBase(ABC):
         ...     print(await stream.readline())
         >>>
         >>> # asyncio.run(main())
-        ..\r\n
+        ..\n
         >>>
 
     """
@@ -431,8 +431,8 @@ class PipeStream(StreamBase):
             >>>
             >>> async def main():
             ...     with pygada_runtime.PipeStream() as stream:
-            ...         stream.write(b'hello\r\n')
-            ...         stream.write(b'world\r\n')
+            ...         stream.write(b'hello\n')
+            ...         stream.write(b'world\n')
             ...         # Mark EOF and close the writer end
             ...         stream.eof()
             ...
@@ -440,8 +440,8 @@ class PipeStream(StreamBase):
             ...         print(await stream.readline())
             >>>
             >>> asyncio.run(main())
-            b'hello\r\n'
-            b'world\r\n'
+            b'hello\n'
+            b'world\n'
             >>>
 
         :return: bytes including the newline character

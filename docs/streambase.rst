@@ -9,6 +9,10 @@ StreamBase Class
 .. autoclass:: pygada_runtime::StreamBase
     :members:
 
+.. autoclass:: pygada_runtime::BytesIOStream
+
+.. autoclass:: pygada_runtime::TextIOStream
+
 .. automethod:: pygada_runtime::async_stream
 
 .. automethod:: pygada_runtime::feed

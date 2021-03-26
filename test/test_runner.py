@@ -6,7 +6,7 @@ import asyncio
 import unittest
 import pygada_runtime
 from pygada_runtime import PipeStream, write_packet, read_packet
-from pygada_runtime.test_utils import *
+from test.utils import *
 import binaryiotools
 
 

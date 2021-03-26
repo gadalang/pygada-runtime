@@ -85,53 +85,78 @@ class StreamBase(ABC):
 
     @abstractmethod
     async def read(self, size: int = -1) -> bytes:
+        """Read ``size`` bytes or until EOF.
+
+        :param size: number of bytes to read
+        :return: byte array
+        """
         raise NotImplementedError()
 
     async def readexactly(self, size: int = -1) -> bytes:
-        data = await self.read(size)
-        if len(data) != size:
-            raise Exception(f"{len(data)} != {size}")
-        return data
+        """Read exactly ``size`` bytes.
+
+        :param size: number of bytes to read
+        :return: byte array
+        """
+        return await self.read(size)
 
     @abstractmethod
     async def readline(self) -> bytes:
+        """Read all bytes until newline character.
+
+        :return: byte array
+        """
         raise NotImplementedError()
 
     @abstractmethod
-    def write(self, data):
+    def write(self, data: bytes):
+        """Write a raw byte array.
+
+        :param data: byte array
+        """
         raise NotImplementedError()
 
     @abstractmethod
     async def drain(self):
+        """Drain written data."""
         raise NotImplementedError()
 
     @abstractmethod
     def eof(self):
+        """Close and mark EOF."""
         raise NotImplementedError()
 
     @abstractmethod
     def close(self):
-        """
-        Ask to close the connection.
-
-        """
+        """Close inner transport layer."""
         raise NotImplementedError()
 
     @abstractmethod
     async def wait_closed(self):
-        """
-        Return when the connection is fully closed.
-
-        """
+        """Wait for the transport layer to be closed."""
         raise NotImplementedError()
 
 
 class TextIOStream(StreamBase):
-    def __init__(self, inner: io.TextIOBase):
-        """Wrap a ``TextIOBase`` throught common ``StreamBase`` interface.
+    r"""Async wrapper for ``io.TextIOBase``:
 
-        :param inner: TextIOBase to wrap
-        """
+    .. code-block:: python
+
+        >>> import io
+        >>> import asyncio
+        >>> import pygada_runtime
+        >>>
+        >>> async def main():
+        ...     stream = pygada_runtime.TextIOStream(io.StringIO("hello"))
+        ...     print(await stream.read())
+        >>>
+        >>> asyncio.run(main())
+        b'hello'
+        >>>
+
+    """
+
+    def __init__(self, inner: io.TextIOBase):
         self._inner = inner
 
     async def read(self, size: int = -1) -> bytes:
@@ -163,11 +188,25 @@ class TextIOStream(StreamBase):
 
 
 class BytesIOStream(StreamBase):
-    def __init__(self, inner: io.BytesIO):
-        """Wrap a ``BytesIO`` throught common ``StreamBase`` interface.
+    r"""Async wrapper for ``io.BytesIO``:
 
-        :param inner: BytesIO to wrap
-        """
+    .. code-block:: python
+
+        >>> import io
+        >>> import asyncio
+        >>> import pygada_runtime
+        >>>
+        >>> async def main():
+        ...     stream = pygada_runtime.BytesIOStream(io.BytesIO(b'hello'))
+        ...     print(await stream.read())
+        >>>
+        >>> asyncio.run(main())
+        b'hello'
+        >>>
+
+    """
+
+    def __init__(self, inner: io.BytesIO):
         self._inner = inner
 
     async def read(self, size: int = -1) -> bytes:

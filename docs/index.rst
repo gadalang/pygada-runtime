@@ -43,10 +43,12 @@ Contents:
 .. toctree::
    :maxdepth: 2
 
-   runner
+   api
+   process
    streambase
    pipestream
    iofunctions
+   examples
 
 Indices and tables
 ==================

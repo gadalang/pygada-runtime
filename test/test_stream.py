@@ -9,7 +9,7 @@ from pygada_runtime import (
     TextIOStream,
     StreamBase,
 )
-from pygada_runtime.test_utils import *
+from test.utils import *
 
 
 class StreamTestCase(unittest.TestCase):

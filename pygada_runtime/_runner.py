@@ -1,3 +1,6 @@
+""":mod:`pygada_runtime` provides a convenient way to run others gada nodes
+and process their output.
+"""
 __all__ = ["Process", "run"]
 import sys
 import os
@@ -7,12 +10,21 @@ from ._stream import StreamBase, async_stream, feed
 
 
 class Process:
-    def __init__(self, proc, *, stdout: StreamBase = None, stderr: StreamBase = None):
-        """Process instance.
+    """Wrap a subprocess running a gada node.
 
-        :param stdout: output stream (default sys.stdout)
-        :param stderr: error stream (default sys.stderr)
-        """
+    The subprocess ``stdout`` and ``stderr`` are redirected to
+    :attr:`stdout` and :attr:`stderr` passed in arguments so you can
+    read from the subprocess output.
+
+    It is advised to use :meth:`pygada_runtime.run` instead of
+    using directly this class.
+
+    :param proc: subprocess instance
+    :param stdout: output stream (default is sys.stdout)
+    :param stderr: error stream (default is sys.stderr)
+    """
+
+    def __init__(self, proc, *, stdout: StreamBase = None, stderr: StreamBase = None):
         self._proc = proc
         self._stdout = async_stream(stdout if stdout is not None else sys.stdout)
         self._stderr = async_stream(stderr if stderr is not None else sys.stderr)
@@ -30,6 +42,10 @@ class Process:
 
     @property
     def returncode(self):
+        """Get return code from process.
+
+        :return: return code
+        """
         return self._proc.returncode
 
     async def wait(self):
@@ -46,7 +62,34 @@ async def run(
     stdout: StreamBase = None,
     stderr: StreamBase = None,
 ) -> Process:
-    """Run a gada node.
+    r"""Run a gada node:
+
+    .. code-block:: python
+
+        >>> import asyncio
+        >>> import pygada_runtime
+        >>>
+        >>> async def main():
+        ...     with pygada_runtime.PipeStream() as stdout:
+        ...         # Run "gada testnodes.sum 1 2" in a subprocess
+        ...         proc = await pygada_runtime.run("testnodes.sum", [1, 2], stdout=stdout)
+        ...
+        ...         # Wait for completion
+        ...         await proc.wait()
+        ...
+        ...         # Read subprocess output
+        ...         output = await stdout.read()
+        ...
+        ...         # Print raw byte array output
+        ...         print(output)
+        ...
+        ...         # Print output converted to str and remove newline
+        ...         print(output.decode().strip())
+        >>>
+        >>> asyncio.run(main())
+        b'3\r\n'
+        3
+        >>>
 
     :param node: gada node to run
     :param argv: additional CLI arguments
@@ -57,6 +100,7 @@ async def run(
     :return: Process instance
     """
     argv = argv if argv is not None else []
+    env = env if env is not None else {}
 
     _env = os.environ
     _env.update(env)
@@ -64,7 +108,7 @@ async def run(
     # Spawn a subprocess
     return Process(
         proc=await asyncio.create_subprocess_shell(
-            f"gada {node} {' '.join(argv)}",
+            f"gada {node} {' '.join(str(_) for _ in argv)}",
             env=_env,
             stdin=stdin,
             stdout=asyncio.subprocess.PIPE,

@@ -48,7 +48,7 @@ Contents:
    streambase
    pipestream
    iofunctions
-   examples
+   writing
 
 Indices and tables
 ==================

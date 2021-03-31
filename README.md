@@ -34,3 +34,7 @@ The `test` directory contains many tests that you can run with:
 ```python
 $ tox .
 ```
+
+## License
+
+Licensed under the [MIT](LICENSE) License.

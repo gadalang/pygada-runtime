@@ -8,6 +8,7 @@ import pygada_runtime
 
 def hello(argv, *, stdout=None, **kwargs):
     """Entrypoint used with **pymodule** runner."""
+
     def run(args):
         print(f"hello {args.name} !", file=stdout if stdout is not None else sys.stdout)
 

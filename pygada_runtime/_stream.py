@@ -387,7 +387,7 @@ class PipeStream(StreamBase):
 
     """
 
-    def __init__(self, *, rmode:str=None, wmode:str=None, **kwargs):
+    def __init__(self, *, rmode: str = None, wmode: str = None, **kwargs):
         """Stream allowing both read and write operations.
 
         This is a wrapper for ``os.pipe()`` and make read operations
@@ -401,7 +401,9 @@ class PipeStream(StreamBase):
         wmode = wmode if wmode is not None else "wb"
 
         self._r, self._w = os.pipe()
-        self._r, self._w = os.fdopen(self._r, rmode, **kwargs), os.fdopen(self._w, wmode, **kwargs)
+        self._r, self._w = os.fdopen(self._r, rmode, **kwargs), os.fdopen(
+            self._w, wmode, **kwargs
+        )
 
     def __enter__(self):
         return self

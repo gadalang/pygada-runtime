@@ -30,6 +30,7 @@ class SafeTask:
 
     :param coro: task to run
     """
+
     def __init__(self, coro):
         self._coro = coro
         self._task = None
@@ -66,6 +67,7 @@ def timeout(fun):
 
     :return: decorated function result
     """
+
     async def wrapper(*args, **kwargs):
         return await asyncio.wait_for(fun(*args, **kwargs), timeout=1)
 
@@ -88,6 +90,7 @@ def async_test(fun):
 
     :return: decorated function result
     """
+
     def wrapper(*args, **kwargs):
         return asyncio.run(fun(*args, **kwargs))
 

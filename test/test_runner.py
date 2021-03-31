@@ -5,100 +5,56 @@ import io
 import asyncio
 import unittest
 import pygada_runtime
-from pygada_runtime import PipeStream, write_packet, read_packet
-from test.utils import *
-import binaryiotools
-
-
-def run(node, argv=[], *, stdin=None):
-    def wrapper(fun):
-        async def worker(
-            *args,
-            **kwargs,
-        ):
-            # Create readable stdout and stderr streams
-            with PipeStream() as stdout:
-                with PipeStream() as stderr:
-                    # Run gada node
-                    proc = await pygada_runtime.run(
-                        node,
-                        argv,
-                        env={"PYTHONPATH": os.path.dirname(__file__)},
-                        stdin=stdin,
-                        stdout=stdout,
-                        stderr=stderr,
-                    )
-
-                    # Wait for completion
-                    await proc.wait()
-
-                    # Call wrapped function
-                    await fun(*args, proc=proc, stdout=stdout, stderr=stderr, **kwargs)
-
-        return worker
-
-    return wrapper
+from pygada_runtime import PipeStream, write_packet, read_packet, test_utils
 
 
 class RunnerTestCase(unittest.TestCase):
-    @async_test
-    @run("testnodes.sum", ["1", "2"])
-    async def test_sum_stdout(self, proc, stdout, stderr):
-        """Test reading stdout from ``testnodes.sum``."""
-        # Check stderr is empty
-        self.assertEqual(await stderr.read(), b"")
+    async def run(
+        self,
+        argv
+    ):
+        # Run gada node
+        stdout, stderr = await test_utils.run(argv)
 
-        # Output on stdout should be "3"
-        self.assertEqual(await stdout.read(1), b"3")
+        # Check outputs
+        if has_stderr is False:
+            self.assertEqual(stderr, "", "should have no stderr")
+        elif has_stderr is True:
+            self.assertNotEqual(stderr, "", "should have stderr")
+        if has_stdout is False:
+            self.assertEqual(stdout, "", "should have no stdout")
+        elif has_stdout is True:
+            self.assertNotEqual(stdout, "", "should have stdout")
 
-    @async_test
-    @run("testnodes.sum", ["-h"])
-    async def test_sum_help(self, proc, stdout, stderr):
-        """Test printing help from ``testnodes.sum``."""
-        # Check stderr is empty
-        self.assertEqual(await stderr.read(), b"")
+        return stdout.strip(), stderr.strip()
 
-        # Check help message is in stdout
-        self.assertIn(b"usage: sum [-h]", await stdout.read())
+    @test_utils.async_test
+    async def test_python_hello(self):
+        """Test running ``testnodes.hello``."""
+        stdout, stderr = self.run(["testnodes.hello", "john"], has_stdout=True, has_stderr=False)
 
-    @async_test
-    @run("testnodes.sum", ["1"])
-    async def test_sum_stderr(self, proc, stdout, stderr):
-        """Test reading stderr from ``testnodes.sum``."""
-        # Check stdout is empty
-        self.assertEqual(await stdout.read(), b"")
+        self.assertEqual(stdout, "hello john !", 'wrong output')
 
-        # Exception should be: "expected at least two int"
-        self.assertIn(b"expected at least two int", await stderr.read())
+    @test_utils.async_test
+    async def test_python_hello_stderr(self):
+        """Test running ``testnodes.hello`` without arguments => print argparse help."""
+        stdout, stderr = self.run(["testnodes.hello"], has_stdout=False, has_stderr=True)
 
-    @async_test
-    async def test_sum_chain(self):
-        """Test chain mode ``testnodes.sum``."""
-        # Create a writable stdin stream
-        with PipeStream() as stdin:
+        self.assertIn("usage: hello [-h]", stderr, 'wrong output')
 
-            @run(
-                node="testnodes.sum",
-                argv=["--chain-input", "--chain-output"],
-                stdin=stdin.reader,
-            )
-            async def worker(proc, stdout, stderr):
-                # Exception should be: "expected a list of int"
-                data = await read_packet(stdout)
-                buffer = binaryiotools.IO(data)
-                self.assertEqual(buffer.i32, 3)
+    @test_utils.async_test
+    async def test_pymodule_hello(self):
+        """Test running ``testnodes.pymodule_hello``."""
+        stdout, stderr = self.run(["testnodes.pymodule_hello", "john"], has_stdout=True, has_stderr=False)
 
-            # Write a list of int to stdin
-            buffer = binaryiotools.IO()
-            buffer.i32 = 2
-            buffer.i32 = 1
-            buffer.i32 = 2
-            buffer.index = 0
-            write_packet(stdin, buffer.data)
-            stdin.eof()
+        self.assertEqual(stdout, "hello john !", 'wrong output')
 
-            # Run gada node
-            await worker()
+    @test_utils.async_test
+    async def test_pymodule_hello_stderr(self):
+        """Test running ``testnodes.pymodule_hello`` without arguments => print argparse help."""
+        stdout, stderr = self.run(["testnodespymodule_hello"], has_stdout=False, has_stderr=True)
+
+        self.assertIn("usage: hello [-h]", stderr, 'wrong output')
 
 
 if __name__ == "__main__":

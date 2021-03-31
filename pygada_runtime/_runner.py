@@ -71,8 +71,8 @@ async def run(
         >>>
         >>> async def main():
         ...     with pygada_runtime.PipeStream() as stdout:
-        ...         # Run "gada testnodes.sum 1 2" in a subprocess
-        ...         proc = await pygada_runtime.run("testnodes.sum", [1, 2], stdout=stdout)
+        ...         # Run "gada testnodes.hello" in a subprocess
+        ...         proc = await pygada_runtime.run('testnodes.hello', ['john'], stdout=stdout)
         ...
         ...         # Wait for completion
         ...         await proc.wait()
@@ -84,7 +84,7 @@ async def run(
         ...         print(output.decode().strip())
         >>>
         >>> asyncio.run(main())
-        3
+        hello john !
         >>>
 
     :param node: gada node to run

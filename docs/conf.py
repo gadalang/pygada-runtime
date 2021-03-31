@@ -23,7 +23,7 @@ copyright = ""
 author = "gadalang"
 
 # The full version, including alpha/beta/rc tags
-release = "0.1a"
+release = "0.2a"
 
 master_doc = "index"
 

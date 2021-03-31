@@ -1,4 +1,7 @@
 nodes:
-  sum:
+  pymodule_hello:
+    runner: pymodule
+    entrypoint: hello
+  hello:
     runner: python
-    file: __init__.py
+    file: ${comp_dir}/__init__.py

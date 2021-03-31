@@ -362,16 +362,46 @@ class PipeStream(StreamBase):
         b'hello world'
         >>>
 
+    By default, the pipe is opened in binary mode. But you change this behavior by doing:
+
+    .. code-block:: python
+
+        >>> import sys
+        >>> import asyncio
+        >>> import pygada_runtime
+        >>>
+        >>> async def main():
+        ...     # Open the pipe in text mode
+        ...     with pygada_runtime.PipeStream(rmode='r', wmode='w') as stream:
+        ...         # Can write text
+        ...         stream.write('hello world')
+        ...         # Close the writer end and mark EOF
+        ...         stream.eof()
+        ...
+        ...         # Can read text
+        ...         print(await stream.read())
+        >>>
+        >>> asyncio.run(main())
+        hello world
+        >>>
+
     """
 
-    def __init__(self):
+    def __init__(self, *, rmode:str=None, wmode:str=None, **kwargs):
         """Stream allowing both read and write operations.
 
         This is a wrapper for ``os.pipe()`` and make read operations
         asynchronous.
+
+        :param rmode: reading mode
+        :param wmode: writing mode
+        :param kwargs: additional arguments for ``fdopen``
         """
+        rmode = rmode if rmode is not None else "rb"
+        wmode = wmode if wmode is not None else "wb"
+
         self._r, self._w = os.pipe()
-        self._r, self._w = os.fdopen(self._r, "rb"), os.fdopen(self._w, "wb")
+        self._r, self._w = os.fdopen(self._r, rmode, **kwargs), os.fdopen(self._w, wmode, **kwargs)
 
     def __enter__(self):
         return self
@@ -387,7 +417,7 @@ class PipeStream(StreamBase):
     def writer(self):
         return self._w
 
-    async def read(self, size: int = -1) -> bytes:
+    async def read(self, size: int = -1):
         r"""Read ``size`` bytes from the reader end or until EOF:
 
         .. code-block:: python
@@ -420,7 +450,7 @@ class PipeStream(StreamBase):
             None, functools.partial(self._r.read, size)
         )
 
-    async def readline(self) -> bytes:
+    async def readline(self):
         r"""Read bytes from the reader end until newline character:
 
         .. code-block:: python
@@ -449,8 +479,8 @@ class PipeStream(StreamBase):
         # Avoid blocking the main thread
         return await asyncio.get_event_loop().run_in_executor(None, self._r.readline)
 
-    def write(self, data: bytes):
-        r"""Write a raw byte array to the writer end:
+    def write(self, data):
+        r"""Write data to the writer end:
 
         .. code-block:: python
 
@@ -471,7 +501,7 @@ class PipeStream(StreamBase):
             b'helloworld'
             >>>
 
-        :param data: byte array
+        :param data: data to write
         """
         self._w.write(data)
 

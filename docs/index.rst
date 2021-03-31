@@ -54,6 +54,7 @@ Contents:
    streambase
    pipestream
    iofunctions
+   testutils
    writing
 
 Indices and tables

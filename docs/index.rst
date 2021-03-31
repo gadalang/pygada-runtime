@@ -23,7 +23,7 @@ Installation
 Testing
 -------
 
-The `test` directory contains many tests that you can run with:
+The ``test`` directory contains many tests that you can run with:
 
 .. code-block:: bash
 
@@ -35,6 +35,12 @@ Dependencies
 
 - Python 3.7+
 - gada_
+
+
+License
+-------
+
+Licensed under the MIT License.
 
 
 Contents:

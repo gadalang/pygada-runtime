@@ -29,10 +29,10 @@ setup(
     author_email=pkg_info["__author_email__"],
     url=pkg_info["__url__"],
     project_urls={
-        "Bug Tracker": "https://github.com/Nauja/pygada-runtime/issues",
-        "Source Code": "https://github.com/Nauja/pygada-runtime/",
+        "Bug Tracker": "https://github.com/gadalang/pygada-runtime/issues",
+        "Source Code": "https://github.com/gadalang/pygada-runtime/",
     },
-    description="Python frontend for mysql cli",
+    description="Python runtime for gada nodes",
     long_description=readme(),
     long_description_content_type="text/markdown",
     packages=find_packages(exclude=["tests"]),

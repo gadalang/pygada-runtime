@@ -58,7 +58,7 @@ async def run(
     argv: List = None,
     *,
     env: dict = None,
-    stdin=None,
+    stdin: Optional[any] = None,
     stdout: StreamBase = None,
     stderr: StreamBase = None,
 ) -> Process:

@@ -7,6 +7,7 @@ import os
 import asyncio
 from typing import Optional, List
 from ._stream import StreamBase, async_stream, feed
+from ._intercom import start_intercom, IntercomServer
 
 
 class Process:
@@ -22,12 +23,21 @@ class Process:
     :param proc: subprocess instance
     :param stdout: output stream (default is sys.stdout)
     :param stderr: error stream (default is sys.stderr)
+    :param intercom: intercom server
     """
 
-    def __init__(self, proc, *, stdout: StreamBase = None, stderr: StreamBase = None):
+    def __init__(
+        self,
+        proc,
+        *,
+        stdout: Optional[StreamBase] = None,
+        stderr: Optional[StreamBase] = None,
+        intercom: Optional[IntercomServer] = None,
+    ):
         self._proc = proc
         self._stdout = async_stream(stdout if stdout is not None else sys.stdout)
         self._stderr = async_stream(stderr if stderr is not None else sys.stderr)
+        self._intercom = intercom
 
         self._task = asyncio.create_task(
             asyncio.wait(
@@ -40,8 +50,24 @@ class Process:
             )
         )
 
+    def __aenter__(self):
+        return self
+
+    def __aexit__(self, *args, **kwargs):
+        if self._intercom:
+            self._intercom.__aexit__(self, *args, **kwargs)
+            self._intercom = None
+
     @property
-    def returncode(self):
+    def intercom(self) -> IntercomServer:
+        """Get intercom server.
+
+        :return: intercom server
+        """
+        return self._intercom
+
+    @property
+    def returncode(self) -> int:
         """Get return code from process.
 
         :return: return code
@@ -59,8 +85,10 @@ async def run(
     *,
     env: dict = None,
     stdin: Optional[any] = None,
-    stdout: StreamBase = None,
-    stderr: StreamBase = None,
+    stdout: Optional[StreamBase] = None,
+    stderr: Optional[StreamBase] = None,
+    use_intercom: Optional[bool] = None,
+    intercom: Optional[IntercomServer] = None,
 ) -> Process:
     r"""Run a gada node:
 
@@ -93,6 +121,8 @@ async def run(
     :param stdin: input stream (default sys.stdin)
     :param stdout: output stream (default sys.stdout)
     :param stderr: error stream (default sys.stderr)
+    :param use_intercom: use intercom
+    :param intercom: intercom server
     :return: Process instance
     """
     argv = argv if argv is not None else []
@@ -100,6 +130,14 @@ async def run(
 
     _env = os.environ
     _env.update(env)
+
+    # Start intercom server
+    if use_intercom or intercom is not None:
+        if intercom is None:
+            intercom = await start_intercom()
+        argv = ["--intercom-port", intercom.port] + argv
+    else:
+        intercom = None
 
     # Spawn a subprocess
     return Process(
@@ -112,4 +150,5 @@ async def run(
         ),
         stdout=stdout,
         stderr=stderr,
+        intercom=intercom,
     )

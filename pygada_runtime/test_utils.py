@@ -97,7 +97,9 @@ def async_test(fun):
     return wrapper
 
 
-async def run(node: str, argv: Optional[list[str]] = None) -> tuple[str, str]:
+async def run(
+    node: str, argv: Optional[list[str]] = None, *, intercom: Optional[any] = None
+) -> tuple[str, str]:
     """Run a gada node and return a tuple ``(stdout, stderr)``:
 
     .. code-block:: python
@@ -115,6 +117,7 @@ async def run(node: str, argv: Optional[list[str]] = None) -> tuple[str, str]:
 
     :param node: node to run
     :param argv: CLI arguments
+    :param intercom: intercom server
     :return: ``(stdout, stderr)`` tuple
     """
     # Create readable stdout and stderr streams
@@ -122,10 +125,7 @@ async def run(node: str, argv: Optional[list[str]] = None) -> tuple[str, str]:
         with pygada_runtime.PipeStream(rmode="r", wmode="wb") as stderr:
             # Run gada node
             proc = await pygada_runtime.run(
-                node,
-                argv,
-                stdout=stdout,
-                stderr=stderr,
+                node, argv, stdout=stdout, stderr=stderr, intercom=intercom
             )
 
             # Wait for completion

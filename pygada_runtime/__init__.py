@@ -4,3 +4,4 @@ from .__version__ import __version_major__, __version_long__, __version__, __sta
 from ._main import *
 from ._runner import Process, run
 from ._stream import *
+from ._intercom import *

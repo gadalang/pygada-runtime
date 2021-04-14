@@ -260,9 +260,11 @@ def async_stream(inner) -> StreamBase:
         return TextIOStream(inner)
     if isinstance(inner, asyncio.StreamReader):
         return inner
+    if isinstance(inner, asyncio.StreamWriter):
+        return inner
 
     raise Exception(
-        f"expected an instance of io.BytesIO, io.TextIOBase, asyncio.StreamReader or StreamBase, got {inner.__class__.__name__}"
+        f"expected an instance of io.BytesIO, io.TextIOBase, asyncio.StreamReader, asyncio.StreamWriter or StreamBase, got {inner.__class__.__name__}"
     )
 
 

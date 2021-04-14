@@ -1,7 +1,11 @@
 nodes:
   pymodule_hello:
     runner: pymodule
-    entrypoint: hello
+    module: testnodes._hello
+    entrypoint: main
   hello:
     runner: python
-    file: ${comp_dir}/__init__.py
+    file: ${comp_dir}/_hello.py
+  hello_intercom:
+    runner: python
+    file: ${comp_dir}/_hello_intercom.py

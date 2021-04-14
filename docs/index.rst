@@ -54,6 +54,7 @@ Contents:
    streambase
    pipestream
    iofunctions
+   intercom
    testutils
    writing
 

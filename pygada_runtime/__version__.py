@@ -1,7 +1,7 @@
 # -*- coding: utf-8 -*-
 
 # pygada_runtime's package version information
-__version_major__ = "0.3"
+__version_major__ = "0.4"
 __version__ = "{}a".format(__version_major__)
 __version_long__ = "{}a".format(__version_major__)
 __status__ = "Alpha"

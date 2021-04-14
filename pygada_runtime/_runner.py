@@ -50,13 +50,12 @@ class Process:
             )
         )
 
-    def __aenter__(self):
+    async def __aenter__(self):
         return self
 
-    def __aexit__(self, *args, **kwargs):
+    async def __aexit__(self, *args, **kwargs):
         if self._intercom:
-            self._intercom.__aexit__(self, *args, **kwargs)
-            self._intercom = None
+            await self._intercom.__aexit__(self, *args, **kwargs)
 
     @property
     def intercom(self) -> IntercomServer:

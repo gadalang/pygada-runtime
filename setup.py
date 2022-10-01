@@ -1,17 +1,16 @@
 # type: ignore
 """Setup script."""
 import io
-from builtins import _OpenFile
 from setuptools import find_packages, setup
 
 
-def readme() -> str:
+def readme():
     """Return the content of README.md."""
     with open("README.md", "r") as f:
         return f.read()
 
 
-def read(*filenames: _OpenFile, **kwargs: dict) -> str:
+def read(*filenames, **kwargs):
     """Read contents of multiple files and join them together."""
     encoding: str = kwargs.get("encoding", "utf-8")
     sep = kwargs.get("sep", "\n")

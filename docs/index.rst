@@ -57,6 +57,8 @@ Contents:
    intercom
    testutils
    writing
+   datadir
+   typing
 
 Indices and tables
 ==================

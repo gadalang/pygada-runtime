@@ -1,15 +1,19 @@
+# type: ignore
+"""Setup script."""
 import io
+from builtins import _OpenFile
 from setuptools import find_packages, setup
 
 
-def readme():
+def readme() -> str:
+    """Return the content of README.md."""
     with open("README.md", "r") as f:
         return f.read()
 
 
-def read(*filenames, **kwargs):
-    """ Read contents of multiple files and join them together """
-    encoding = kwargs.get("encoding", "utf-8")
+def read(*filenames: _OpenFile, **kwargs: dict) -> str:
+    """Read contents of multiple files and join them together."""
+    encoding: str = kwargs.get("encoding", "utf-8")
     sep = kwargs.get("sep", "\n")
     buf = []
     for filename in filenames:
@@ -36,15 +40,14 @@ setup(
     long_description=readme(),
     long_description_content_type="text/markdown",
     packages=find_packages(exclude=["tests"]),
-    install_requires=["binaryiotools"],
+    install_requires=["pyyaml", "antlr4-python3-runtime==4.10"],
     include_package_data=True,
     zip_safe=False,
-    python_requires=">=3.7",
+    python_requires=">=3.8",
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
         "Topic :: Software Development :: Build Tools",
-        "Programming Language :: Python :: 3.7",
         "Programming Language :: Python :: 3.8",
         "Programming Language :: Python :: 3.9",
     ],

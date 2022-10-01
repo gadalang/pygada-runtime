@@ -7,7 +7,7 @@
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
 [![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/gadalang/pygada-runtime/issues)
 
-Python runtime for [gada](https://github.com/gadalang/gada) nodes.
+`pygada-runtime` is a package for creating and running [Gada](https://github.com/gadalang/gada) nodes in Python.
 
 ## Install
 

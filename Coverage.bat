@@ -1,1 +1,0 @@
-..\gada\venv\Scripts\coverage.exe run --source=pygada_runtime -m unittest discover -b && ..\gada\venv\Scripts\coverage.exe html

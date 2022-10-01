@@ -1,7 +1,7 @@
+"""Package for creating and running Gada nodes in Python."""
 from . import __version__ as version_info
-from .__version__ import __version_major__, __version_long__, __version__, __status__
+from .__version__ import __version__
+from .__main__ import AbstractRunContext, run
 
-from ._main import *
-from ._runner import Process, run
-from ._stream import *
-from ._intercom import *
+
+__all__ = ["AbstractRunContext", "run", "__version__", "version_info"]

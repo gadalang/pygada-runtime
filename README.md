@@ -6,7 +6,6 @@
 [![Checked with mypy](http://www.mypy-lang.org/static/mypy_badge.svg)](http://mypy-lang.org/)
 [![Codecov](https://img.shields.io/codecov/c/gh/gadalang/pygada-runtime?token=4CSJTL1ZML)](https://codecov.io/gh/gadalang/pygada-runtime)
 [![Code style: black](https://img.shields.io/badge/code%20style-black-000000.svg)](https://github.com/psf/black)
-[![contributions welcome](https://img.shields.io/badge/contributions-welcome-brightgreen.svg?style=flat)](https://github.com/gadalang/pygada-runtime/issues)
 
 `pygada-runtime` is a package for creating and running [Gada](https://github.com/gadalang/gada) nodes in Python.
 

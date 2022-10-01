@@ -14,7 +14,7 @@
 Using pip:
 
 ```bash
-$ pip3 install pygada-runtime
+pip install pygada-runtime
 ```
 
 ## Documentation
@@ -22,7 +22,7 @@ $ pip3 install pygada-runtime
 Build the doc with:
 
 ```bash
-$ make html
+make html
 ```
 
 You can find the latest documentation on [pygada-runtime.readthedocs.io](https://pygada-runtime.readthedocs.io/).
@@ -32,7 +32,7 @@ You can find the latest documentation on [pygada-runtime.readthedocs.io](https:/
 The `test` directory contains many tests that you can run with:
 
 ```python
-$ tox .
+tox .
 ```
 
 ## License

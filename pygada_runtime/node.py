@@ -156,19 +156,15 @@ class Node(object):
         :param module: parent module
         :return: loaded **Node**
         """
-        name = o.pop("name", None)
-        if not name:
-            raise Exception("missing name attribute for node")
-
         return Node(
-            name=name,
+            name=o.get("name", None),
             module=module,
-            file=o.pop("file", None),
-            lineno=o.pop("lineno", None),
-            runner=o.pop("runner", None),
-            is_pure=o.pop("pure", False),
-            inputs=[Param.from_dict(_) for _ in o.pop("inputs", [])],
-            outputs=[Param.from_dict(_) for _ in o.pop("outputs", [])],
+            file=o.get("file", None),
+            lineno=o.get("lineno", None),
+            runner=o.get("runner", None),
+            is_pure=o.get("pure", False),
+            inputs=[Param.from_dict(_) for _ in o.get("inputs", [])],
+            outputs=[Param.from_dict(_) for _ in o.get("outputs", [])],
             extras=o,
         )
 

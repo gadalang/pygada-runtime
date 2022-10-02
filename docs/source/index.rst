@@ -33,7 +33,7 @@ The ``test`` directory contains many tests that you can run with:
 Dependencies
 ------------
 
-- Python 3.7+
+- Python 3.8+
 - gada_
 
 

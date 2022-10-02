@@ -38,7 +38,7 @@ setup(
     description="Python runtime for gada nodes",
     long_description=readme(),
     long_description_content_type="text/markdown",
-    packages=find_packages(exclude=["tests"]),
+    packages=find_packages(exclude=["test"]),
     install_requires=["pyyaml", "antlr4-python3-runtime==4.10"],
     include_package_data=True,
     zip_safe=False,

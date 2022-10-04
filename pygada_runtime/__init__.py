@@ -1,5 +1,5 @@
 """Package for creating and running Gada nodes in Python."""
-__all__ = ["AbstractRunContext", "run", "node", "__version__", "version_info"]
+__all__ = ["AbstractRunContext", "run", "__version__", "version_info"]
 from . import __version__ as version_info
 from .__version__ import __version__
 import os
@@ -7,7 +7,7 @@ import subprocess
 from tempfile import NamedTemporaryFile
 import json
 from abc import ABC, abstractmethod
-from typing import Optional, Union, Any
+from typing import Optional, Union
 from pygada_runtime.node import Node
 from pygada_runtime.program import Program
 
@@ -91,15 +91,3 @@ def run(
     :param gada_bin: custom path to **gada** binary
     """
     return _RunContext(prog, gada_bin=gada_bin)
-
-
-def node(_fun: Optional[Any] = None) -> Any:
-    """Wrap a Gada node."""
-
-    def decorator(fun: Any) -> Any:
-        def wrapper(*args: list, **kwargs: dict) -> Any:
-            return fun(*args, **kwargs)
-
-        return wrapper
-
-    return decorator if _fun is None else decorator(_fun)

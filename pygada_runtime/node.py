@@ -1,11 +1,14 @@
 """Package containing everything for manipulating nodes."""
 from __future__ import annotations
 
-__all__ = ["Param", "Node", "NodeCall"]
+__all__ = ["Param", "Node", "NodeCall", "iter_modules", "iter_nodes"]
+import os
 from dataclasses import dataclass
 from types import ModuleType
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Iterable
 from pathlib import Path
+import pkgutil
+import yaml
 from pygada_runtime import typing, parser
 
 if TYPE_CHECKING:
@@ -261,3 +264,45 @@ class NodeCall(object):
             "lineno": self.lineno,
             "inputs": [_.to_dict() for _ in self.inputs],
         }
+
+
+@dataclass
+class NodeLoader(object):
+    location: str
+    name: str
+    _config: dict
+
+    def __init__(self, location: str, name: str, *, config: dict) -> None:
+        object.__setattr__(self, "location", location)
+        object.__setattr__(self, "name", name)
+        object.__setattr__(self, "_config", config)
+
+    def load(self) -> Optional[Node]:
+        return Node.from_dict(self._config)
+
+
+def iter_modules(path: Optional[Iterable[str]] = None) -> Iterable[str]:
+    """List root modules including a **gada.yml** file."""
+
+    def iter_directories() -> Iterable[str]:
+        for finder, name, _ in pkgutil.iter_modules(path):
+            root = os.path.join(str(finder), name)
+            if os.path.isdir(root):
+                yield root
+
+    for _ in iter_directories():
+        if os.path.exists(os.path.join(_, "gada.yml")):
+            yield _
+
+
+def iter_nodes(path: Optional[Iterable[str]] = None) -> Iterable[NodeLoader]:
+    """List installed nodes."""
+    for root in iter_modules(path):
+        with open(os.path.join(root, "gada.yml"), "r", encoding="utf8") as f:
+            content = yaml.safe_load(f)
+
+        if not content:
+            break
+
+        for _ in content.get("nodes", []):
+            yield NodeLoader(root, _["name"], config=_)

@@ -1,6 +1,4 @@
 sphinx_autodoc_typehints
 sphinx_rtd_theme
-m2r2
-asyncio
-gada
-gada_pyrunner
+pyyaml
+antlr4-python3-runtime==4.10

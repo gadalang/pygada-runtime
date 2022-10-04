@@ -1,9 +1,18 @@
 """Package containing everything for manipulating nodes."""
 from __future__ import annotations
 
-__all__ = ["Param", "Node", "NodeCall", "iter_modules", "iter_nodes"]
+__all__ = [
+    "Param",
+    "Node",
+    "NodeCall",
+    "NodeLoader",
+    "iter_modules",
+    "walk_modules",
+    "iter_nodes",
+    "walk_nodes",
+]
 import os
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from types import ModuleType
 from typing import TYPE_CHECKING, Iterable
 from pathlib import Path
@@ -12,7 +21,8 @@ import yaml
 from pygada_runtime import typing, parser
 
 if TYPE_CHECKING:
-    from typing import Optional, Any
+    from typing import Optional, Any, Callable
+    from pkgutil import ModuleInfo
 
 
 @dataclass
@@ -268,41 +278,115 @@ class NodeCall(object):
 
 @dataclass
 class NodeLoader(object):
-    location: str
-    name: str
-    _config: dict
+    """Class for loading a node defined in a module."""
 
-    def __init__(self, location: str, name: str, *, config: dict) -> None:
-        object.__setattr__(self, "location", location)
+    module_info: ModuleInfo
+    name: str
+    _config: dict = field(repr=False)
+
+    def __init__(
+        self, module_info: ModuleInfo, name: str, *, config: dict
+    ) -> None:
+        object.__setattr__(self, "module_info", module_info)
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "_config", config)
 
-    def load(self) -> Optional[Node]:
+    def load(self) -> Node:
+        """Load the node."""
         return Node.from_dict(self._config)
 
 
-def iter_modules(path: Optional[Iterable[str]] = None) -> Iterable[str]:
-    """List root modules including a **gada.yml** file."""
+def _module_path(mod: ModuleInfo) -> str:
+    """Return the path to a module.
 
-    def iter_directories() -> Iterable[str]:
-        for finder, name, _ in pkgutil.iter_modules(path):
-            root = os.path.join(str(finder), name)
-            if os.path.isdir(root):
-                yield root
+    :param mod: module infos
+    """
+    mod_path = mod.module_finder.path  # type: ignore
+    return os.path.join(mod_path, mod.name.split(".")[-1])
 
-    for _ in iter_directories():
-        if os.path.exists(os.path.join(_, "gada.yml")):
-            yield _
+
+def _module_gada_yml(mod: ModuleInfo) -> str:
+    """Return the path the **gada.yml** file in a module.
+
+    :param mod: module infos
+    """
+    return os.path.join(_module_path(mod), "gada.yml")
+
+
+def _iter_modules(
+    fun: Callable[[Optional[Iterable[str]]], Iterable[ModuleInfo]],
+    path: Optional[Iterable[str]] = None,
+) -> Iterable[ModuleInfo]:
+    """Yield modules containing a **gada.yml** file.
+
+    :param path: either None or a list of paths
+    """
+    for mod in fun(path):
+        if os.path.exists(_module_gada_yml(mod)):
+            yield mod
+
+
+def _iter_nodes(
+    fun: Callable[[Optional[Iterable[str]]], Iterable[ModuleInfo]],
+    path: Optional[Iterable[str]] = None,
+) -> Iterable[NodeLoader]:
+    """Yield nodes from installed modules.
+
+    :param path: either None or a list of paths
+    """
+    for mod in fun(path):
+        with open(_module_gada_yml(mod), "r", encoding="utf8") as f:
+            content = yaml.safe_load(f)
+
+        if content is not None:
+            for _ in content.get("nodes", []):
+                yield NodeLoader(mod, _["name"], config=_)
+
+
+def iter_modules(path: Optional[Iterable[str]] = None) -> Iterable[ModuleInfo]:
+    """Yield top-level modules containing a **gada.yml** file.
+
+    This function only returns top-level modules installed in
+    the **PYTHONPATH**. See :func:`walk_modules` for a fully
+    recursive version.
+
+    :param path: either None or a list of paths
+    """
+    return _iter_modules(pkgutil.iter_modules, path)
+
+
+def walk_modules(path: Optional[Iterable[str]] = None) -> Iterable[ModuleInfo]:
+    """Yield all modules containing a **gada.yml** file recursively.
+
+    This function recursively analyze the modules installed in
+    the **PYTHONPATH** to return not only the top-level modules,
+    but also the submodules containing a **gada.yml** file. See
+    :func:`iter_modules` for a non recursive version.
+
+    :param path: either None or a list of paths
+    """
+    return _iter_modules(pkgutil.walk_packages, path)
 
 
 def iter_nodes(path: Optional[Iterable[str]] = None) -> Iterable[NodeLoader]:
-    """List installed nodes."""
-    for root in iter_modules(path):
-        with open(os.path.join(root, "gada.yml"), "r", encoding="utf8") as f:
-            content = yaml.safe_load(f)
+    """Yield top-level nodes installed in the **PYTHONPATH**.
 
-        if not content:
-            break
+    This function only returns nodes from top-level modules installed
+    in the **PYTHONPATH**. See :func:`walk_nodes` for a fully
+    recursive version.
 
-        for _ in content.get("nodes", []):
-            yield NodeLoader(root, _["name"], config=_)
+    :param path: either None or a list of paths
+    """
+    return _iter_nodes(iter_modules, path)
+
+
+def walk_nodes(path: Optional[Iterable[str]] = None) -> Iterable[NodeLoader]:
+    """Yield all nodes installed in the **PYTHONPATH** recursively.
+
+    This function not only returns nodes from top-level modules installed
+    in the **PYTHONPATH**, but also from submodules. See :func:`iter_nodes`
+    for a non recursive version.
+
+    :param path: either None or a list of paths
+    """
+    return _iter_nodes(walk_modules, path)

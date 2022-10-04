@@ -1,0 +1,3 @@
+# Nodes located in a subpackage.
+nodes:
+- name: bar

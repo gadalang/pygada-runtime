@@ -7,6 +7,10 @@
 .. automodule:: pygada_runtime.typing
     :noindex:
 
+.. automethod:: pygada_runtime.typing::isinstance
+
+.. automethod:: pygada_runtime.typing::typeof
+
 .. autoclass:: pygada_runtime.typing::Type
     :members:
 
@@ -36,7 +40,3 @@
 
 .. autoclass:: pygada_runtime.typing::UnionType
     :members:
-
-.. automethod:: pygada_runtime.typing::isinstance
-
-.. automethod:: pygada_runtime.typing::typeof

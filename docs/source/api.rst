@@ -6,6 +6,4 @@
 
 .. automodule:: pygada_runtime
 
-.. automethod:: pygada_runtime::get_parser
-
-.. automethod:: pygada_runtime::main
+.. automethod:: pygada_runtime::run

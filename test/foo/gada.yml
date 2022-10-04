@@ -1,0 +1,3 @@
+# Nodes located in top-level package.
+nodes:
+- name: foo

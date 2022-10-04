@@ -9,7 +9,7 @@ Welcome to pygada-runtime's documentation!
 .. _gada: https://github.com/gadalang/gada
 
 
-Python runtime for gada_ nodes.
+``pygada-runtime`` is a package for creating and running gada_ nodes in Python.
 
 
 Installation
@@ -34,7 +34,6 @@ Dependencies
 ------------
 
 - Python 3.8+
-- gada_
 
 
 License
@@ -50,14 +49,8 @@ Contents:
    :maxdepth: 2
 
    api
-   process
-   streambase
-   pipestream
-   iofunctions
-   intercom
-   testutils
-   writing
-   datadir
+   node
+   program
    typing
 
 Indices and tables

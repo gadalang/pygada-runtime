@@ -6,6 +6,9 @@ __all__ = [
     "Node",
     "NodeCall",
     "NodeLoader",
+    "module_name",
+    "module_path",
+    "module_gada_yml",
     "iter_modules",
     "walk_modules",
     "iter_nodes",
@@ -18,11 +21,14 @@ from typing import TYPE_CHECKING, Iterable
 from pathlib import Path
 import pkgutil
 import yaml
+import importlib
 from pygada_runtime import typing, parser
 
 if TYPE_CHECKING:
-    from typing import Optional, Any, Callable
+    from typing import Optional, Any, Callable, IO, Union
     from pkgutil import ModuleInfo
+
+    ModuleLike = Union[ModuleInfo, ModuleType, str]
 
 
 @dataclass
@@ -296,21 +302,73 @@ class NodeLoader(object):
         return Node.from_dict(self._config)
 
 
-def _module_path(mod: ModuleInfo) -> str:
-    """Return the path to a module.
+def module_name(mod: ModuleLike, /) -> str:
+    """Get the name of a module.
 
-    :param mod: module infos
+    :param mod: a module-like object
     """
-    mod_path = mod.module_finder.path  # type: ignore
-    return os.path.join(mod_path, mod.name.split(".")[-1])
+    if isinstance(mod, str):
+        mod = importlib.import_module(mod)
+
+    if isinstance(mod, ModuleType):
+        return mod.__package__  # type: ignore
+
+    return mod.name
 
 
-def _module_gada_yml(mod: ModuleInfo) -> str:
-    """Return the path the **gada.yml** file in a module.
+def module_path(mod: ModuleLike, /) -> str:
+    """Get the absolute path to a module.
 
-    :param mod: module infos
+    :param mod: a module-like object
     """
-    return os.path.join(_module_path(mod), "gada.yml")
+    if isinstance(mod, str):
+        mod = importlib.import_module(mod)
+
+    if isinstance(mod, ModuleType):
+        path = os.path.dirname(mod.__file__)
+    else:
+        mod_path = mod.module_finder.path  # type: ignore
+        path = os.path.join(mod_path, mod.name.split(".")[-1])
+
+    return os.path.abspath(path)
+
+
+def module_gada_yml(mod: ModuleLike, /) -> str:
+    """Get the absolute path to the **gada.yml** file of a module.
+
+    :param mod: a module-like object
+    """
+    return os.path.join(module_path(mod), "gada.yml")
+
+
+def from_dict(o: dict, /, *, prefix: Optional[str]) -> Iterable[NodeLoader]:
+    raise NotImplementedError()
+
+
+def from_file(
+    fp: Union[IO, str, dict], /, *, prefix: Optional[str]
+) -> Iterable[NodeLoader]:
+    """Yield top-level nodes from a YAML file or string.
+
+    :param mod: a module-like object
+    """
+    if not isinstance(fp, dict):
+        fp = yaml.safe_load(fp)
+
+    return from_dict(fp, prefix=prefix)  # type: ignore
+
+
+def from_module(mod: ModuleLike, /) -> Iterable[NodeLoader]:
+    """Yield top-level nodes from a module.
+
+    :param mod: a module-like object
+    """
+    if isinstance(mod, ModuleInfo):
+        name = mod.name
+    else:
+        name = mod.__package__  # type: ignore
+
+    return from_file(module_gada_yml(mod), prefix=name)
 
 
 def _iter_modules(
@@ -322,7 +380,7 @@ def _iter_modules(
     :param path: either None or a list of paths
     """
     for mod in fun(path):
-        if os.path.exists(_module_gada_yml(mod)):
+        if os.path.exists(module_gada_yml(mod)):
             yield mod
 
 
@@ -335,7 +393,7 @@ def _iter_nodes(
     :param path: either None or a list of paths
     """
     for mod in fun(path):
-        with open(_module_gada_yml(mod), "r", encoding="utf8") as f:
+        with open(module_gada_yml(mod), "r", encoding="utf8") as f:
             content = yaml.safe_load(f)
 
         if content is not None:

@@ -3,12 +3,71 @@ from __future__ import annotations
 import pytest
 from pygada_runtime import node
 from pathlib import Path
-from typing import Any
+from typing import Any, Union
+from types import ModuleType
+from pkgutil import ModuleInfo
+from test import foo
+from test.foo import bar
 
 
 TEST_DIR = str(Path(__file__).parent.absolute())
 FOO_DIR = str(Path(TEST_DIR) / "foo")
+FOO_GADA_YML = str(Path(FOO_DIR) / "gada.yml")
 BAR_DIR = str(Path(FOO_DIR) / "bar")
+BAR_GADA_YML = str(Path(BAR_DIR) / "gada.yml")
+
+
+@pytest.mark.node
+@pytest.mark.parametrize(
+    "mod,expected",
+    [
+        ("foo", "foo"),
+        ("test.foo", "test.foo"),
+        (foo, "test.foo"),
+        ("foo.bar", "foo.bar"),
+        ("test.foo.bar", "test.foo.bar"),
+        (bar, "test.foo.bar"),
+    ],
+)
+def test_module_name(mod: Union[ModuleInfo, ModuleType], expected: str) -> None:
+    """Test **module_name** returns the correct name."""
+    assert node.module_name(mod) == expected
+
+
+@pytest.mark.node
+@pytest.mark.parametrize(
+    "mod,expected",
+    [
+        ("foo", FOO_DIR),
+        ("test.foo", FOO_DIR),
+        (foo, FOO_DIR),
+        ("foo.bar", BAR_DIR),
+        ("test.foo.bar", BAR_DIR),
+        (bar, BAR_DIR),
+    ],
+)
+def test_module_path(mod: Union[ModuleInfo, ModuleType], expected: str) -> None:
+    """Test **module_path** returns the correct absolute path."""
+    assert node.module_path(mod) == expected
+
+
+@pytest.mark.node
+@pytest.mark.parametrize(
+    "mod,expected",
+    [
+        ("foo", FOO_GADA_YML),
+        ("test.foo", FOO_GADA_YML),
+        (foo, FOO_GADA_YML),
+        ("foo.bar", BAR_GADA_YML),
+        ("test.foo.bar", BAR_GADA_YML),
+        (bar, BAR_GADA_YML),
+    ],
+)
+def test_module_gada_yml(
+    mod: Union[ModuleInfo, ModuleType], expected: str
+) -> None:
+    """Test **module_gada_yml** returns the correct absolute path."""
+    assert node.module_gada_yml(mod) == expected
 
 
 @pytest.mark.node
@@ -29,7 +88,7 @@ def test_iter_modules(
     fun: Any, path: str, expected: list[str], unexpected: list[str]
 ) -> None:
     """Test both **iter_modules** and **walk_modules**."""
-    modules = list(map(node._module_path, fun(path)))
+    modules = list(map(node.module_path, fun(path)))
     # Those are in PYTHONPATH and should be returned
     for _ in expected:
         assert _ in modules
@@ -56,7 +115,7 @@ def test_iter_nodes(
     fun: Any, path: str, expected: list[str], unexpected: list[str]
 ) -> None:
     """Test both **iter_nodes** and **walk_nodes**."""
-    nodes = list(map(lambda _: _.name, fun(path)))
+    nodes = [_.name for _ in fun(path)]
     # Those are in PYTHONPATH and should be returned
     for _ in expected:
         assert _ in nodes

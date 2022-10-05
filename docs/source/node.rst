@@ -19,6 +19,12 @@
 .. autoclass:: pygada_runtime.node::NodeLoader
     :members:
 
+.. automethod:: pygada_runtime.node::module_name
+
+.. automethod:: pygada_runtime.node::module_path
+
+.. automethod:: pygada_runtime.node::module_gada_yml
+
 .. automethod:: pygada_runtime.node::iter_modules
 
 .. automethod:: pygada_runtime.node::walk_modules

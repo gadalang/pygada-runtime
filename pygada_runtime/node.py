@@ -6,29 +6,20 @@ __all__ = [
     "Node",
     "NodeCall",
     "NodeLoader",
-    "module_name",
-    "module_path",
-    "module_gada_yml",
-    "iter_modules",
-    "walk_modules",
     "iter_nodes",
     "walk_nodes",
 ]
-import os
 from dataclasses import dataclass, field
 from types import ModuleType
 from typing import TYPE_CHECKING, Iterable
 from pathlib import Path
-import pkgutil
 import yaml
-import importlib
-from pygada_runtime import typing, parser
+from pygada_runtime import typing, parser, module
 
 if TYPE_CHECKING:
     from typing import Optional, Any, Callable, IO, Union
     from pkgutil import ModuleInfo
-
-    ModuleLike = Union[ModuleInfo, ModuleType, str]
+    from pygada_runtime.module import ModuleLike
 
 
 @dataclass
@@ -55,9 +46,7 @@ class Param(object):
     ) -> None:
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "value", value)
-        object.__setattr__(
-            self, "type", type if type is not None else typing.AnyType()
-        )
+        object.__setattr__(self, "type", type if type is not None else typing.AnyType())
         object.__setattr__(self, "help", help)
 
     @staticmethod
@@ -144,9 +133,7 @@ class Node(object):
         object.__setattr__(self, "runner", runner)
         object.__setattr__(self, "is_pure", is_pure)
         object.__setattr__(self, "inputs", inputs if inputs is not None else [])
-        object.__setattr__(
-            self, "outputs", outputs if outputs is not None else []
-        )
+        object.__setattr__(self, "outputs", outputs if outputs is not None else [])
         object.__setattr__(self, "extras", extras if extras is not None else {})
 
     @staticmethod
@@ -263,9 +250,7 @@ class NodeCall(object):
             id=o.get("id", None),
             file=o.get("file", None),
             lineno=o.get("lineno", None),
-            inputs=[
-                Param(name=k, value=v) for k, v in o.get("inputs", {}).items()
-            ],
+            inputs=[Param(name=k, value=v) for k, v in o.get("inputs", {}).items()],
         )
 
     def to_dict(self) -> dict:
@@ -290,9 +275,7 @@ class NodeLoader(object):
     name: str
     _config: dict = field(repr=False)
 
-    def __init__(
-        self, module_info: ModuleInfo, name: str, *, config: dict
-    ) -> None:
+    def __init__(self, module_info: ModuleInfo, name: str, *, config: dict) -> None:
         object.__setattr__(self, "module_info", module_info)
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "_config", config)
@@ -300,45 +283,6 @@ class NodeLoader(object):
     def load(self) -> Node:
         """Load the node."""
         return Node.from_dict(self._config)
-
-
-def module_name(mod: ModuleLike, /) -> str:
-    """Get the name of a module.
-
-    :param mod: a module-like object
-    """
-    if isinstance(mod, str):
-        mod = importlib.import_module(mod)
-
-    if isinstance(mod, ModuleType):
-        return mod.__package__  # type: ignore
-
-    return mod.name
-
-
-def module_path(mod: ModuleLike, /) -> str:
-    """Get the absolute path to a module.
-
-    :param mod: a module-like object
-    """
-    if isinstance(mod, str):
-        mod = importlib.import_module(mod)
-
-    if isinstance(mod, ModuleType):
-        path = os.path.dirname(mod.__file__)
-    else:
-        mod_path = mod.module_finder.path  # type: ignore
-        path = os.path.join(mod_path, mod.name.split(".")[-1])
-
-    return os.path.abspath(path)
-
-
-def module_gada_yml(mod: ModuleLike, /) -> str:
-    """Get the absolute path to the **gada.yml** file of a module.
-
-    :param mod: a module-like object
-    """
-    return os.path.join(module_path(mod), "gada.yml")
 
 
 def from_dict(o: dict, /, *, prefix: Optional[str]) -> Iterable[NodeLoader]:
@@ -368,20 +312,7 @@ def from_module(mod: ModuleLike, /) -> Iterable[NodeLoader]:
     else:
         name = mod.__package__  # type: ignore
 
-    return from_file(module_gada_yml(mod), prefix=name)
-
-
-def _iter_modules(
-    fun: Callable[[Optional[Iterable[str]]], Iterable[ModuleInfo]],
-    path: Optional[Iterable[str]] = None,
-) -> Iterable[ModuleInfo]:
-    """Yield modules containing a **gada.yml** file.
-
-    :param path: either None or a list of paths
-    """
-    for mod in fun(path):
-        if os.path.exists(module_gada_yml(mod)):
-            yield mod
+    return from_file(module.gada_yml_path(mod), prefix=name)
 
 
 def _iter_nodes(
@@ -393,7 +324,7 @@ def _iter_nodes(
     :param path: either None or a list of paths
     """
     for mod in fun(path):
-        with open(module_gada_yml(mod), "r", encoding="utf8") as f:
+        with open(module.gada_yml_path(mod), "r", encoding="utf8") as f:
             content = yaml.safe_load(f)
 
         if content is not None:
@@ -401,50 +332,29 @@ def _iter_nodes(
                 yield NodeLoader(mod, _["name"], config=_)
 
 
-def iter_modules(path: Optional[Iterable[str]] = None) -> Iterable[ModuleInfo]:
-    """Yield top-level modules containing a **gada.yml** file.
-
-    This function only returns top-level modules installed in
-    the **PYTHONPATH**. See :func:`walk_modules` for a fully
-    recursive version.
-
-    :param path: either None or a list of paths
-    """
-    return _iter_modules(pkgutil.iter_modules, path)
-
-
-def walk_modules(path: Optional[Iterable[str]] = None) -> Iterable[ModuleInfo]:
-    """Yield all modules containing a **gada.yml** file recursively.
-
-    This function recursively analyze the modules installed in
-    the **PYTHONPATH** to return not only the top-level modules,
-    but also the submodules containing a **gada.yml** file. See
-    :func:`iter_modules` for a non recursive version.
-
-    :param path: either None or a list of paths
-    """
-    return _iter_modules(pkgutil.walk_packages, path)
-
-
-def iter_nodes(path: Optional[Iterable[str]] = None) -> Iterable[NodeLoader]:
+def iter_nodes(mod: Optional[ModuleLike] = None) -> Iterable[NodeLoader]:
     """Yield top-level nodes installed in the **PYTHONPATH**.
 
     This function only returns nodes from top-level modules installed
     in the **PYTHONPATH**. See :func:`walk_nodes` for a fully
     recursive version.
 
-    :param path: either None or a list of paths
+    :param mod: a module-like object
     """
-    return _iter_nodes(iter_modules, path)
+    return _iter_nodes(
+        module.iter_modules, [module.module_path(mod)] if mod is not None else None
+    )
 
 
-def walk_nodes(path: Optional[Iterable[str]] = None) -> Iterable[NodeLoader]:
+def walk_nodes(mod: Optional[ModuleLike] = None) -> Iterable[NodeLoader]:
     """Yield all nodes installed in the **PYTHONPATH** recursively.
 
     This function not only returns nodes from top-level modules installed
     in the **PYTHONPATH**, but also from submodules. See :func:`iter_nodes`
     for a non recursive version.
 
-    :param path: either None or a list of paths
+    :param mod: a module-like object
     """
-    return _iter_nodes(walk_modules, path)
+    return _iter_nodes(
+        module.walk_modules, [module.module_path(mod)] if mod is not None else None
+    )

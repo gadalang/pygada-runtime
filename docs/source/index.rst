@@ -49,6 +49,7 @@ Contents:
    :maxdepth: 2
 
    api
+   module
    node
    program
    typing

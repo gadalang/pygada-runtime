@@ -13,6 +13,8 @@
 
 .. automethod:: pygada_runtime.module::gada_yml_path
 
+.. automethod:: pygada_runtime.module::load_gada_yml
+
 .. automethod:: pygada_runtime.module::iter_modules
 
 .. automethod:: pygada_runtime.module::walk_modules

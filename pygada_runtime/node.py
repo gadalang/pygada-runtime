@@ -6,20 +6,25 @@ __all__ = [
     "Node",
     "NodeCall",
     "NodeLoader",
+    "load",
+    "from_module",
     "iter_nodes",
     "walk_nodes",
 ]
 from dataclasses import dataclass, field
-from types import ModuleType
 from typing import TYPE_CHECKING, Iterable
 from pathlib import Path
 import yaml
-from pygada_runtime import typing, parser, module
+from pygada_runtime import typing, parser, module, _cache
 
 if TYPE_CHECKING:
     from typing import Optional, Any, Callable, IO, Union
     from pkgutil import ModuleInfo
     from pygada_runtime.module import ModuleLike
+
+
+class NodeNotFoundException(Exception):
+    pass
 
 
 @dataclass
@@ -104,7 +109,7 @@ class Node(object):
     """
 
     name: str
-    module: ModuleType
+    module: str
     file: Path
     lineno: int
     runner: str
@@ -117,7 +122,7 @@ class Node(object):
         self,
         name: str,
         *,
-        module: Optional[ModuleType] = None,
+        module: Optional[str] = None,
         file: Optional[Path] = None,
         lineno: Optional[int] = None,
         runner: Optional[str] = None,
@@ -137,7 +142,7 @@ class Node(object):
         object.__setattr__(self, "extras", extras if extras is not None else {})
 
     @staticmethod
-    def from_dict(o: dict, /, *, module: Optional[ModuleType] = None) -> Node:
+    def from_dict(o: dict, /, *, module: Optional[str] = None) -> Node:
         r"""Create a new **Node** from a JSON dict.
 
         .. code-block:: python
@@ -271,90 +276,187 @@ class NodeCall(object):
 class NodeLoader(object):
     """Class for loading a node defined in a module."""
 
-    module_info: ModuleInfo
+    module: Optional[str]
     name: str
-    _config: dict = field(repr=False)
+    _path: str
+    _node: Optional[Node] = field(repr=False)
 
-    def __init__(self, module_info: ModuleInfo, name: str, *, config: dict) -> None:
-        object.__setattr__(self, "module_info", module_info)
+    def __init__(
+        self, module: Optional[str], name: str, node: Optional[Node] = None
+    ) -> None:
+        object.__setattr__(self, "module", module)
         object.__setattr__(self, "name", name)
-        object.__setattr__(self, "_config", config)
+        object.__setattr__(
+            self,
+            "_path",
+            "{}{}".format(
+                f"{self.module}." if self.module is not None else "", self.name
+            ),
+        )
+        object.__setattr__(self, "_node", node)
 
     def load(self) -> Node:
         """Load the node."""
-        return Node.from_dict(self._config)
+        if self._node is None:
+            self._node = load(self._path)
+
+        return self._node
 
 
-def from_dict(o: dict, /, *, prefix: Optional[str]) -> Iterable[NodeLoader]:
-    raise NotImplementedError()
+def load(path: str, /) -> Node:
+    """Load a node by its path.
 
-
-def from_file(
-    fp: Union[IO, str, dict], /, *, prefix: Optional[str]
-) -> Iterable[NodeLoader]:
-    """Yield top-level nodes from a YAML file or string.
-
-    :param mod: a module-like object
+    :param path: node path
     """
+    parts = path.rsplit(".", maxsplit=1)
+    mod = parts[0] if len(parts) == 2 else "gada"
+    name = parts[-1]
+
+    def _loader() -> Node:
+        for _ in module.load_gada_yml(mod).get("nodes", []):
+            if _.get("name", None) == name:
+                return Node.from_dict(_, module=mod)
+
+        raise NodeNotFoundException()
+
+    return _cache.get_cached_node(mod, name, _loader)
+
+
+def _from_file(
+    fp: Union[IO, str, dict], /, *, module: Optional[str]
+) -> Iterable[NodeLoader]:
+    """Yield nodes from a YAML file or string.
+
+    :param fp: a file-like object or dict
+    :param module: module path
+    """
+    if isinstance(fp, str):
+        with open(fp, "r", encoding="utf8") as f:
+            fp = f.read()
+
     if not isinstance(fp, dict):
         fp = yaml.safe_load(fp)
 
-    return from_dict(fp, prefix=prefix)  # type: ignore
+    for _ in fp.get("nodes", []):  # type: ignore
+        yield NodeLoader(module, _["name"], _)
 
 
 def from_module(mod: ModuleLike, /) -> Iterable[NodeLoader]:
-    """Yield top-level nodes from a module.
+    """Yield top-level nodes of a module.
+
+    Imagine you have the following package:
+
+    .. code-block::
+
+        sample/
+        ├─ __init__.py
+        ├─ gada.yml
+        ├─ foo/
+        │  ├─ __init__.py
+        │  ├─ gada.yml
+        │  ├─ bar/
+        │  │  ├─ __init__.py
+        │  │  ├─ gada.yml
+        ├─ baz/
+        │  ├─ __init__.py
+        │  ├─ gada.yml
+
+    This is what you would get in the different scenarios:
+
+    - `from_module("sample")`: nodes from `sample` module.
+    - `from_module("sample.foo")`: nodes from `foo` module.
+    - `from_module("sample.foo.bar")`: nodes from `bar` module.
+    - `from_module("sample.baz")`: nodes from `baz` module.
 
     :param mod: a module-like object
     """
-    if isinstance(mod, ModuleInfo):
-        name = mod.name
-    else:
-        name = mod.__package__  # type: ignore
-
-    return from_file(module.gada_yml_path(mod), prefix=name)
+    return _from_file(module.gada_yml_path(mod), module=module.module_name(mod))
 
 
 def _iter_nodes(
-    fun: Callable[[Optional[Iterable[str]]], Iterable[ModuleInfo]],
-    path: Optional[Iterable[str]] = None,
+    fun: Callable[[Optional[ModuleLike]], Iterable[ModuleInfo]],
+    mod: Optional[ModuleLike] = None,
 ) -> Iterable[NodeLoader]:
     """Yield nodes from installed modules.
 
     :param path: either None or a list of paths
     """
-    for mod in fun(path):
-        with open(module.gada_yml_path(mod), "r", encoding="utf8") as f:
+    for item in fun(mod):
+        with open(module.gada_yml_path(item), "r", encoding="utf8") as f:
             content = yaml.safe_load(f)
 
         if content is not None:
             for _ in content.get("nodes", []):
-                yield NodeLoader(mod, _["name"], config=_)
+                yield NodeLoader(item.name, _["name"], _)
 
 
 def iter_nodes(mod: Optional[ModuleLike] = None) -> Iterable[NodeLoader]:
-    """Yield top-level nodes installed in the **PYTHONPATH**.
+    """Yield nodes from top-level modules of a parent module or **PYTHONPATH**.
 
-    This function only returns nodes from top-level modules installed
-    in the **PYTHONPATH**. See :func:`walk_nodes` for a fully
-    recursive version.
+    This function only returns nodes from top-level modules. See
+    :func:`walk_nodes` for a fully recursive version.
+
+    Imagine you have the following package:
+
+    .. code-block::
+
+        sample/
+        ├─ __init__.py
+        ├─ gada.yml
+        ├─ foo/
+        │  ├─ __init__.py
+        │  ├─ gada.yml
+        │  ├─ bar/
+        │  │  ├─ __init__.py
+        │  │  ├─ gada.yml
+        ├─ baz/
+        │  ├─ __init__.py
+        │  ├─ gada.yml
+
+    This is what you would get in the different scenarios:
+
+    - `iter_nodes()`: nodes from `sample` module.
+    - `iter_nodes("sample")`: nodes from `foo` and `baz` modules.
+    - `iter_nodes("sample.foo")`: nodes from `bar` module.
+    - `iter_nodes("sample.foo.bar")`: an empty list.
+    - `iter_nodes("sample.baz")`: an empty list.
 
     :param mod: a module-like object
     """
-    return _iter_nodes(
-        module.iter_modules, [module.module_path(mod)] if mod is not None else None
-    )
+    return _iter_nodes(module.iter_modules, mod)
 
 
 def walk_nodes(mod: Optional[ModuleLike] = None) -> Iterable[NodeLoader]:
-    """Yield all nodes installed in the **PYTHONPATH** recursively.
+    """Yield nodes from all submodules of a parent module or **PYTHONPATH**.
 
-    This function not only returns nodes from top-level modules installed
-    in the **PYTHONPATH**, but also from submodules. See :func:`iter_nodes`
-    for a non recursive version.
+    This function not only returns nodes from top-level modules, but also
+    from submodules. See :func:`iter_nodes` for a non recursive version.
+
+    Imagine you have the following package:
+
+    .. code-block::
+
+        sample/
+        ├─ __init__.py
+        ├─ gada.yml
+        ├─ foo/
+        │  ├─ __init__.py
+        │  ├─ gada.yml
+        │  ├─ bar/
+        │  │  ├─ __init__.py
+        │  │  ├─ gada.yml
+        ├─ baz/
+        │  ├─ __init__.py
+        │  ├─ gada.yml
+
+    This is what you would get in the different scenarios:
+
+    - `walk_nodes()`: nodes from `sample`, `foo`, `bar` and `baz` modules.
+    - `walk_nodes("sample")`: nodes from `foo`, `bar` and `baz` modules.
+    - `walk_nodes("sample.foo")`: nodes from `bar` module.
+    - `walk_nodes("sample.foo.bar")`: an empty list.
+    - `walk_nodes("sample.baz")`: an empty list.
 
     :param mod: a module-like object
     """
-    return _iter_nodes(
-        module.walk_modules, [module.module_path(mod)] if mod is not None else None
-    )
+    return _iter_nodes(module.walk_modules, mod)

@@ -1,14 +1,34 @@
 """Tests on the **pygada_runtime.module** module."""
 from __future__ import annotations
 import pytest
+from typing import TYPE_CHECKING
 from pygada_runtime import module
-from pathlib import Path
-from typing import Any, Union
-from types import ModuleType
-from pkgutil import ModuleInfo
 from test import foo
 from test.foo import bar
-from test.conftest import *
+from test.conftest import (
+    FOO_DIR,
+    BAR_DIR,
+    FOO_GADA_YML,
+    BAR_GADA_YML,
+    clean_test,
+)
+
+if TYPE_CHECKING:
+    from typing import Any, Iterable
+    from pkgutil import ModuleInfo
+    from pygada_runtime.module import ModuleLike
+
+
+def _assert_modules(
+    modules: Iterable[ModuleInfo], expected: list[str], unexpected: list[str]
+) -> None:
+    paths = [module.module_path(_) for _ in modules]
+    # Those are in PYTHONPATH and should be returned
+    for _ in expected:
+        assert _ in paths
+    # Those are subpackages and should not be returned
+    for _ in unexpected:
+        assert _ not in paths
 
 
 @pytest.mark.module
@@ -23,7 +43,8 @@ from test.conftest import *
         (bar, "test.foo.bar"),
     ],
 )
-def test_module_name(mod: Union[ModuleInfo, ModuleType], expected: str) -> None:
+@clean_test
+def test_module_name(mod: ModuleLike, expected: str) -> None:
     """Test **module_name** returns the correct name."""
     assert module.module_name(mod) == expected
 
@@ -40,7 +61,8 @@ def test_module_name(mod: Union[ModuleInfo, ModuleType], expected: str) -> None:
         (bar, BAR_DIR),
     ],
 )
-def test_module_path(mod: Union[ModuleInfo, ModuleType], expected: str) -> None:
+@clean_test
+def test_module_path(mod: ModuleLike, expected: str) -> None:
     """Test **module_path** returns the correct absolute path."""
     assert module.module_path(mod) == expected
 
@@ -57,33 +79,27 @@ def test_module_path(mod: Union[ModuleInfo, ModuleType], expected: str) -> None:
         (bar, BAR_GADA_YML),
     ],
 )
-def test_gada_yml_path(mod: Union[ModuleInfo, ModuleType], expected: str) -> None:
+@clean_test
+def test_gada_yml_path(mod: ModuleLike, expected: str) -> None:
     """Test **gada_yml_path** returns the correct absolute path."""
     assert module.gada_yml_path(mod) == expected
 
 
 @pytest.mark.module
 @pytest.mark.parametrize(
-    "fun,path,expected,unexpected",
+    "fun,mod,expected,unexpected",
     [
         (module.iter_modules, None, [FOO_DIR], [BAR_DIR]),
         (module.walk_modules, None, [FOO_DIR, BAR_DIR], []),
-        (module.iter_modules, ["test"], [FOO_DIR], [BAR_DIR]),
-        (module.walk_modules, ["test"], [FOO_DIR, BAR_DIR], []),
-        (module.iter_modules, ["test/foo"], [BAR_DIR], []),
-        (module.walk_modules, ["test/foo"], [BAR_DIR], []),
-        (module.iter_modules, ["invalidpath"], [], []),
-        (module.walk_modules, ["invalidpath"], [], []),
+        (module.iter_modules, "test", [FOO_DIR], [BAR_DIR]),
+        (module.walk_modules, "test", [FOO_DIR, BAR_DIR], []),
+        (module.iter_modules, "test.foo", [BAR_DIR], []),
+        (module.walk_modules, "test.foo", [BAR_DIR], []),
     ],
 )
+@clean_test
 def test_iter_modules(
-    fun: Any, path: str, expected: list[str], unexpected: list[str]
+    fun: Any, mod: ModuleLike, expected: list[str], unexpected: list[str]
 ) -> None:
     """Test both **iter_modules** and **walk_modules**."""
-    modules = list(map(module.module_path, fun(path)))
-    # Those are in PYTHONPATH and should be returned
-    for _ in expected:
-        assert _ in modules
-    # Those are subpackages and should not be returned
-    for _ in unexpected:
-        assert _ not in modules
+    _assert_modules(fun(mod), expected, unexpected)

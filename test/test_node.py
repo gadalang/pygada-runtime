@@ -3,7 +3,13 @@ from __future__ import annotations
 import pytest
 from pygada_runtime import node
 from pygada_runtime.node import NodeLoader
-from test.conftest import clean_test
+from test.conftest import (
+    BAR_GADA_YML,
+    FOO_GADA_YML,
+    clean_test,
+    FOO_DIR,
+    BAR_DIR,
+)
 from typing import TYPE_CHECKING
 
 if TYPE_CHECKING:
@@ -64,13 +70,25 @@ def test_from_module(
 
 @pytest.mark.node
 @pytest.mark.parametrize(
-    "mod,name,expected",
+    "mod,name,package,file",
     [
-        ("test.foo", "foo", ["foo"]),
-        ("test.foo.bar", "bar", ["bar"]),
+        ("test.foo", "foo", FOO_DIR, FOO_GADA_YML),
+        ("test.foo.bar", "bar", BAR_DIR, BAR_GADA_YML),
     ],
 )
 @clean_test
-def test_nodeloader(mod: str, name: str, expected: list[str]) -> None:
+def test_nodeloader(mod: str, name: str, package: str, file: str) -> None:
     """Test **NodeLoader** correctly loads nodes."""
-    _assert_nodes([NodeLoader(mod, name).load()], expected, [])
+
+    def _assert(n: Any) -> None:
+        assert n.module == mod
+        assert n.name == name
+        assert n.__package__ == package
+        assert n.__file__ == file
+        assert n.__path__ == f"{mod}.{name}"
+
+    n = NodeLoader(mod, name)
+    # First check NodeLoader class
+    _assert(n)
+    # Then check Node class
+    _assert(n.load())

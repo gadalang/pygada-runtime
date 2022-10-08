@@ -22,6 +22,8 @@ if TYPE_CHECKING:
     from pkgutil import ModuleInfo
     from pygada_runtime.module import ModuleLike
 
+    NodeLike = Union["Node", "NodeLoader", str]
+
 
 class NodeNotFoundException(Exception):
     pass
@@ -51,7 +53,9 @@ class Param(object):
     ) -> None:
         object.__setattr__(self, "name", name)
         object.__setattr__(self, "value", value)
-        object.__setattr__(self, "type", type if type is not None else typing.AnyType())
+        object.__setattr__(
+            self, "type", type if type is not None else typing.AnyType()
+        )
         object.__setattr__(self, "help", help)
 
     @staticmethod
@@ -93,7 +97,25 @@ class Param(object):
         }
 
 
-@dataclass(frozen=True)
+def _fill_metadata(node: Any, mod: Optional[ModuleLike], name: str) -> None:
+    object.__setattr__(
+        node,
+        "__package__",
+        module.module_path(mod) if mod is not None else None,
+    )
+    object.__setattr__(
+        node,
+        "__file__",
+        module.gada_yml_path(mod) if mod is not None else None,
+    )
+    object.__setattr__(
+        node,
+        "__path__",
+        "{}{}".format(f"{mod}." if mod is not None else "", name),
+    )
+
+
+@dataclass
 class Node(object):
     """Represent a node definition.
 
@@ -117,6 +139,12 @@ class Node(object):
     inputs: list[Param]
     outputs: list[Param]
     extras: dict
+    """Absolute path to Python package containing the node."""
+    __package__: str = field(repr=False)
+    """Absolute path to file containing the node."""
+    __file__: str = field(repr=False)
+    """Fully qualified path to the node **module.name**."""
+    __path__: str = field(repr=False)
 
     def __init__(
         self,
@@ -138,8 +166,11 @@ class Node(object):
         object.__setattr__(self, "runner", runner)
         object.__setattr__(self, "is_pure", is_pure)
         object.__setattr__(self, "inputs", inputs if inputs is not None else [])
-        object.__setattr__(self, "outputs", outputs if outputs is not None else [])
+        object.__setattr__(
+            self, "outputs", outputs if outputs is not None else []
+        )
         object.__setattr__(self, "extras", extras if extras is not None else {})
+        _fill_metadata(self, module, name)
 
     @staticmethod
     def from_dict(o: dict, /, *, module: Optional[str] = None) -> Node:
@@ -255,7 +286,9 @@ class NodeCall(object):
             id=o.get("id", None),
             file=o.get("file", None),
             lineno=o.get("lineno", None),
-            inputs=[Param(name=k, value=v) for k, v in o.get("inputs", {}).items()],
+            inputs=[
+                Param(name=k, value=v) for k, v in o.get("inputs", {}).items()
+            ],
         )
 
     def to_dict(self) -> dict:
@@ -278,27 +311,27 @@ class NodeLoader(object):
 
     module: Optional[str]
     name: str
-    _path: str
+    """Absolute path to Python package containing the node."""
+    __package__: str = field(repr=False)
+    """Absolute path to file containing the node."""
+    __file__: str = field(repr=False)
+    """Fully qualified path to the node **module.name**."""
+    __path__: str = field(repr=False)
+    """Loaded node if :func:`load` has already been called."""
     _node: Optional[Node] = field(repr=False)
 
     def __init__(
-        self, module: Optional[str], name: str, node: Optional[Node] = None
+        self, mod: Optional[str], name: str, node: Optional[Node] = None
     ) -> None:
-        object.__setattr__(self, "module", module)
+        object.__setattr__(self, "module", mod)
         object.__setattr__(self, "name", name)
-        object.__setattr__(
-            self,
-            "_path",
-            "{}{}".format(
-                f"{self.module}." if self.module is not None else "", self.name
-            ),
-        )
         object.__setattr__(self, "_node", node)
+        _fill_metadata(self, mod, name)
 
     def load(self) -> Node:
         """Load the node."""
         if self._node is None:
-            self._node = load(self._path)
+            self._node = load(self.__path__)
 
         return self._node
 

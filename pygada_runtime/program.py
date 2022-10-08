@@ -1,8 +1,9 @@
 """Interface for creating and running Gada programs."""
 from __future__ import annotations
 
-__all__ = ["Program"]
+__all__ = ["Program", "from_node", "load", "parser"]
 import yaml
+import argparse
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 from pathlib import Path
@@ -11,6 +12,9 @@ from pygada_runtime.node import Param, NodeCall
 
 if TYPE_CHECKING:
     from typing import Optional, Any, Union
+    from argparse import ArgumentParser
+
+    from pygada_runtime.node import Node
 
 
 @dataclass
@@ -93,24 +97,58 @@ class Program(object):
             "outputs": self.outputs,
         }
 
-    @staticmethod
-    def load(file: Union[str, Any], /) -> Program:
-        r"""Load a program from file.
 
-        :param file: filename or filelike object
-        :return: loaded program
-        """
-        path: Optional[Path] = None
+def from_node(o: Node, /) -> Program:
+    """Wrap a single node as a runnable program.
 
-        if isinstance(file, str):
-            path = Path(file)
-            with open(file, "r") as f:
-                content = f.read()
-        elif hasattr(file, "read"):
-            content = file.read()
-        else:
-            raise Exception("argument must be a str or filelike object")
+    :param node: reference to a node
+    """
+    return Program(
+        name=o.name,
+        inputs=o.inputs,
+        outputs="node",
+        steps=[
+            NodeCall(
+                name=o.name,
+                id="node",
+                inputs=[
+                    Param(name=_.name, value=f"{{{{ {_.name} }}}}")
+                    for _ in o.inputs
+                ],
+            )
+        ],
+    )
 
-        conf = yaml.safe_load(content)
-        conf["file"] = path
-        return Program.from_dict(conf)
+
+def load(file: Union[str, Any], /) -> Program:
+    r"""Load a program from file.
+
+    :param file: filename or filelike object
+    :return: loaded program
+    """
+    path: Optional[Path] = None
+
+    if isinstance(file, str):
+        path = Path(file)
+        with open(file, "r") as f:
+            content = f.read()
+    elif hasattr(file, "read"):
+        content = file.read()
+    else:
+        raise Exception("argument must be a str or filelike object")
+
+    conf = yaml.safe_load(content)
+    conf["file"] = path
+    return Program.from_dict(conf)
+
+
+def parser(o: Program, /) -> ArgumentParser:
+    """Build a parser for a program.
+
+    :param o: program
+    """
+    parser = argparse.ArgumentParser(o.name)
+    for _ in o.inputs:
+        parser.add_argument(f"--{_.name}", help=_.help)
+
+    return parser
